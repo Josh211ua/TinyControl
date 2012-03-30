@@ -26,14 +26,20 @@ open hostname port progname =
        return $ Handle sock progname (addrAddress serveraddr)
 
 sendmsg :: Handle -> String -> IO ()
-sendmsg handle msg =
+sendmsg handle msg = do
     sendstr msg
+    count <- receivecount
+    putStrLn count
     where -- Send until everything is done
           sendstr :: String -> IO ()
           sendstr [] = return ()
           sendstr omsg = do sent <- sendTo (hSocket handle) omsg
                                     (hAddress handle)
                             sendstr (genericDrop sent omsg)
+          receivecount :: IO String
+          receivecount = do
+              (msg, num, addr) <- recvFrom (hSocket handle) 1024
+              return msg
           
 close :: Handle -> IO ()
 close handle = sClose (hSocket handle)
