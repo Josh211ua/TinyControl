@@ -6,8 +6,9 @@ import Control.Monad.Trans.Class (lift)
 import Control.Monad.Trans.RWS.Lazy
 import Data.Set (Set)
 import qualified Data.Set as Set
+import Debug.Trace
 
-type HandlerFunc = SockAddr -> String -> CountingStateMonad ()
+type HandlerFunc = Socket -> SockAddr -> String -> CountingStateMonad ()
 
 -- serveLogState :: String
 --               -> HandlerFunc
@@ -23,8 +24,10 @@ serveLog :: String              -- ^ Port number or name; 514 is default
 serveLog port handlerfunc =
     do
       h <- helper --a <- tma
-      let ioh = return h--let ma = return a -- ma should have type (m a) because return is just a typeclass function; this is forced by inference from the next line
-      let ioh' = withSocketsDo ioh--let ma' = f ma -- because f :: (m a -> m a), we have that the input (ma) is of type (m a); this ensures that return does what we want
+      let ioh = return h--let ma = return a
+        -- ma should have type (m a) because return is just a typeclass function; this is forced by inference from the next line
+      let ioh' = withSocketsDo ioh--let ma' = f ma
+        -- because f :: (m a -> m a), we have that the input (ma) is of type (m a); this ensures that return does what we want
       lift ioh'--lift ma' -- since ma' is of type (m a), the lifted version should be (t m a)
 
     where
@@ -50,13 +53,13 @@ serveLog port handlerfunc =
                    -- IP and port into addr
                    (msg, _, addr) <- lift (recvFrom sock 1024)
                    -- Handle it
-                   handlerfunc addr msg
+                   (trace (show msg)) handlerfunc sock addr msg
                    -- And process more messages
                    procMessages sock
 
 -- A simple handler that prints incoming packets
 plainHandler :: HandlerFunc
-plainHandler addr msg = do
+plainHandler sock addr msg = do
     tell $ Set.singleton $ "From " ++ show addr ++ ": " ++ msg
 
 type CountingStateMonad = RWST Int (Set String) Int IO
@@ -67,9 +70,10 @@ increment = do
 
 -- type HandlerFunc = SockAddr -> String -> IO ()
 countingHandler :: HandlerFunc
-countingHandler addr msg = do
+countingHandler sock addr msg = do
     num <- get
     tell $ Set.singleton ((show num) ++ msg)
+    result <- lift $ sendTo sock ("msg" ++ show num) addr
     increment
 
 
