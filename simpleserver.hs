@@ -21,14 +21,12 @@ serveLog :: String              -- ^ Port number or name; 514 is default
          -> HandlerFunc         -- ^ Function to handle incoming messages
          -> CountingStateMonad ()
 serveLog port handlerfunc =
-    --do
-    --  h <- helper -- m a <- t m a
-    --  r <- lift $ withSocketsDo h  -- (m a -> t m a) $ (m a -> m a) (m a)
-    --  return r
-    --helper >>= \h ->
-    --lift $ withSocketsDo h
+    do
+      h <- helper --a <- tma
+      let ioh = return h--let ma = return a -- ma should have type (m a) because return is just a typeclass function; this is forced by inference from the next line
+      let ioh' = withSocketsDo ioh--let ma' = f ma -- because f :: (m a -> m a), we have that the input (ma) is of type (m a); this ensures that return does what we want
+      lift ioh'--lift ma' -- since ma' is of type (m a), the lifted version should be (t m a)
 
-    helper
     where
       helper :: CountingStateMonad () -- t m a
       helper = do -- Look up the port.  Either raises an exception or returns
