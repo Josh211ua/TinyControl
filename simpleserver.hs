@@ -50,10 +50,14 @@ plainHandler addr msg =
 
 type CountingStateMonad = State Int
 increment :: CountingStateMonad Int
-increment = State (\st -> let st' = st + 1 in (st', st'))
+increment = do
+    count <- get
+    put $ count + 1
+    return count
 
 incrementAndGet :: CountingStateMonad Int
 incrementAndGet = do
+    count <- increment
     count <- increment
     return count
 
