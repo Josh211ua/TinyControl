@@ -99,7 +99,16 @@ recv (Handle {addr = a , state = ss})  = --error "recv not implemented"
     helper = error "recv not implemented"
 
 send :: Handle -> Data -> IO (Handle)
-send handle msg = error "send not implemented"
+send (Handle {addr = a , state = ss}) msg = --error "send not implemented"
+  withSocketsDo $
+  do
+    result <- runRWST helper 0 ss
+    print $ show $ result
+    let (_, state,_) = result
+    return $ (Handle {addr = a, state = state})
+  where
+    helper :: ServerStateMonad () -- t m a
+    helper = error "send not implemented"
 
 
 close :: Handle -> IO ()
