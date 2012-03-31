@@ -5,6 +5,7 @@ import Data.ByteString.Char8 (pack)
 main =
   do
     h <- open "1514"
-    h' <- send h [(pack "hello, world")]
+    (handle, friend, msg) <- srecv h
+    handle <- send handle friend [(pack "hello, world")]
     print (show h)
     close h

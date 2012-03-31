@@ -1,5 +1,6 @@
 module TinyControl.Server
   ( Data(..)
+  ,  Friend
   , Handle
   , open
   , recv
@@ -45,10 +46,12 @@ data ServerState = ServerState { rto :: TimeDiff
                                }
                                deriving (Show, Read)
 
-data Handle = Handle { addr :: Addr
-                     , state :: ServerState
-                     }
-                     deriving (Show)
+data Handle s = Handle { addr :: Addr
+                       , state :: s
+                       }
+                       deriving (Show)
+
+type Friend = SockAddr
 
 type ServerStateMonad = RWST Int [String] ServerState IO
 
@@ -97,21 +100,30 @@ open port =
        -- Send back the handle
        return $ Handle { addr=theAddr, state=theState }
 
+recieveHelper :: ServerStateMonad (Friend, Data) -- t m a
+recieveHelper = error "srecv not implemented"
+
+srecv :: Handle -> IO (Handle, Friend, Data)
+recv (Handle {addr = a , state = ss})  = --error "recv not implemented"
+  withSocketsDo $
+  do
+    result <- runRWST receiveHelper 0 ss
+    print $ show $ result
+    let ((friend, val), state,_) = result
+    return $ (Handle {addr = a, state = state}, friend, val)
+    -- Change addr to a new port
 
 recv :: Handle -> IO (Handle, Data)
 recv (Handle {addr = a , state = ss})  = --error "recv not implemented"
   withSocketsDo $
   do
-    result <- runRWST helper 0 ss
+    result <- runRWST receiveHelper 0 ss
     print $ show $ result
-    let (val, state,_) = result
+    let ((_, val), state,_) = result
     return $ (Handle {addr = a, state = state}, val)
-  where
-    helper :: ServerStateMonad (Data) -- t m a
-    helper = error "recv not implemented"
 
-send :: Handle -> Data -> IO (Handle)
-send (Handle {addr = a , state = ss}) msg = --error "send not implemented"
+send :: Handle -> Friend -> Data -> IO (Handle)
+send (Handle {addr = a , state = ss}) friend msg =
   withSocketsDo $
   do
     result <- runRWST helper 0 ss
