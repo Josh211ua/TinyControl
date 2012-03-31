@@ -87,15 +87,15 @@ open hostname port =
 
 
 recv :: Handle -> IO (Handle, Data)
-recv (Handle {addr = _ , state = ss})  = --error "recv not implemented"
+recv (Handle {addr = a , state = ss})  = --error "recv not implemented"
   withSocketsDo $
   do
     result <- runRWST helper 0 ss
     print $ show $ result
-    let (val, _,_) = result
-    return $ val
+    let (val, state,_) = result
+    return $ (Handle {addr = a, state = state}, val)
   where
-    helper :: ServerStateMonad (Handle, Data) -- t m a
+    helper :: ServerStateMonad (Data) -- t m a
     helper = error "recv not implemented"
 
 send :: Handle -> Data -> IO (Handle)
