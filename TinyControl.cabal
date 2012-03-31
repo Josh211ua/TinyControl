@@ -58,3 +58,17 @@ Library
 
   -- Extra tools (e.g. alex, hsc2hs, ...) needed to build the source.
   -- Build-tools:
+
+Executable server
+  -- hs-source-dirs:      executable-src
+  -- .hs or .lhs file containing the Main module.
+  Main-is:             ServerApp.hs
+
+  -- Packages needed in order to build this package.
+  Build-depends: base, containers, old-time, network, bytestring, transformers
+
+  -- Extra tools (e.g. alex, hsc2hs, ...) needed to build the source.
+  -- Build-tools:         alex, happy
+
+  -- Enable compiler warnings
+  --ghc-options:         -Wall -fwarn-tabs -fwarn-incomplete-record-updates -fwarn-monomorphism-restriction -fwarn-unrecognised-pragmas -fwarn-auto-orphans
