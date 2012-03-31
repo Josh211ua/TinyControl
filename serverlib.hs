@@ -44,10 +44,10 @@ open hostname port =
        theSock <- socket (addrFamily serveraddr) Datagram defaultProtocol
 
        -- Save information into an Addr
-       let theAddr = { sock=theSock, address=serveraddr }
+       let theAddr = Addr { sock=theSock, address=serveraddr }
 
        -- Initailize State
-       let theState = -- TODO
+       let theState = undefined-- TODO
 
        -- Send back the handle
        return $ Handle { addr=theAddr, state=theState }
