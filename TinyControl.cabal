@@ -51,7 +51,7 @@ Library
   Exposed-modules:     TinyControl.Server, TinyControl.Packet
 
   -- Packages needed in order to build this package.
-  Build-depends: base, containers, old-time, network, bytestring
+  Build-depends: base, containers, old-time, network, bytestring, transformers
 
   -- Modules not exported by this package.
   -- Other-modules:

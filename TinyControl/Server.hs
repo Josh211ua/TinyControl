@@ -9,8 +9,11 @@ module TinyControl.Server
 
 import qualified TinyControl.Packet as Packet
 
+import Control.Monad.Trans.Class (lift)
+import Control.Monad.Trans.RWS.Lazy
+
 import Data.ByteString (ByteString)
-import Network.Socket (Socket, SockAddr, getAddrInfo, socket, addrFamily, SocketType(Datagram), addrAddress)
+import Network.Socket (Socket, SockAddr, getAddrInfo, socket, addrFamily, SocketType(Datagram), addrAddress, withSocketsDo)
 import Network.BSD (HostName, defaultProtocol)
 import System.Time (TimeDiff(..), CalendarTime, getClockTime, toCalendarTime)
 
@@ -22,6 +25,7 @@ type Data = [ByteString]
 data Addr = Addr { sock :: Socket
                  , address :: SockAddr
                  }
+                 deriving (Show)
 
 data ServerState = ServerState { rto :: TimeDiff
                                , tld :: CalendarTime
@@ -29,10 +33,15 @@ data ServerState = ServerState { rto :: TimeDiff
                                , x_recvset :: Set (CalendarTime, Int)
                                , x :: Int
                                }
+                               deriving (Show, Read)
 
 data Handle = Handle { addr :: Addr
                      , state :: ServerState
                      }
+                     deriving (Show)
+
+type ServerStateMonad = RWST Int [String] ServerState IO
+
 
 makeTimeDiff :: Int -> TimeDiff
 makeTimeDiff sec =
@@ -78,10 +87,20 @@ open hostname port =
 
 
 recv :: Handle -> IO (Handle, Data)
-recv handle = error "recv not implemented"
+recv (Handle {addr = _ , state = ss})  = --error "recv not implemented"
+  withSocketsDo $
+  do
+    result <- runRWST helper 0 ss
+    print $ show $ result
+    let (val, _,_) = result
+    return $ val
+  where
+    helper :: ServerStateMonad (Handle, Data) -- t m a
+    helper = error "recv not implemented"
 
 send :: Handle -> Data -> IO (Handle)
 send handle msg = error "send not implemented"
+
 
 close :: Handle -> IO ()
 close handle = error "close not implemented"
