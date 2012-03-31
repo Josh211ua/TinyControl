@@ -57,7 +57,7 @@ open port =
 
        -- Establish a socket for communication
        theSock <- socket (addrFamily serveraddr) Datagram defaultProtocol
-       --let friend = addrAddress serveraddr
+       --let friend = serveraddr
 
        -- Initailize State
        now <- getClockTime
@@ -79,7 +79,7 @@ recieveHelper = error "srecv not implemented"
 srecv :: Handle ServerState -> IO (Handle ServerState, Friend, Data)
 srecv h = C.srecv h recieveHelper
 
-recv :: Handle ServerState -> IO (Handle ServerState, Data)
+recv :: Handle ServerState -> IO (Handle ServerState, Friend, Data)
 recv h = C.recv h recieveHelper
 
 send :: Handle ServerState -> Friend -> Data -> IO (Handle ServerState)

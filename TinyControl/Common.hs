@@ -62,17 +62,22 @@ srecv (Handle {sock = s , state = ss}) helper  = --error "recv not implemented"
     result <- runRWST helper 0 ss
     print $ show $ result
     let ((friend, val), state,_) = result
-    return $ (Handle {sock = s, state = state}, friend, val)
+    addrinfos <- getAddrInfo
+        (Just (defaultHints {addrFlags = [AI_PASSIVE]})) Nothing Nothing
+    let serveraddr = head addrinfos
+     -- Establish a socket for communication
+    sock <- socket (addrFamily serveraddr) Datagram defaultProtocol
+    return $ (Handle {sock = sock, state = state}, friend, val)
     -- Change addr to a new port
 
-recv ::(Show s) => Handle s -> MyRWST s (Friend, Data) -> IO (Handle s, Data)
+recv ::(Show s) => Handle s -> MyRWST s (Friend, Data) -> IO (Handle s, Friend, Data)
 recv (Handle {sock = a , state = ss}) helper = --error "recv not implemented"
   withSocketsDo $
   do
     result <- runRWST helper 0 ss
     print $ show $ result
-    let ((_, val), state,_) = result
-    return $ (Handle {sock = a, state = state}, val)
+    let ((friend, val), state,_) = result
+    return $ (Handle {sock = a, state = state}, friend, val)
 
 send ::(Show s) => Handle s -> Friend -> Data -> MyRWST s (Handle s) -> IO (Handle s)
 send (Handle {sock = a , state = ss}) friend msg helper =
