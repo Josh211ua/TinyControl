@@ -13,7 +13,7 @@ import Control.Monad.Trans.Class (lift)
 import Control.Monad.Trans.RWS.Lazy
 
 import Data.ByteString (ByteString)
-import Network.Socket (Socket, SockAddr, getAddrInfo, socket, addrFamily, SocketType(Datagram), addrAddress, withSocketsDo)
+import Network.Socket (Socket, SockAddr, getAddrInfo, socket, addrFamily, SocketType(Datagram), addrAddress, withSocketsDo, sClose)
 import Network.BSD (HostName, defaultProtocol)
 import System.Time (TimeDiff(..), CalendarTime, getClockTime, toCalendarTime)
 
@@ -112,4 +112,4 @@ send (Handle {addr = a , state = ss}) msg = --error "send not implemented"
 
 
 close :: Handle -> IO ()
-close handle = error "close not implemented"
+close (Handle {addr = Addr { sock = s, address = _} , state = _}) = sClose (s)
