@@ -7,6 +7,7 @@ module TinyControl.Common
   , recv
   , send
   , close
+  , makeTimeDiff
   ) where
 
 import qualified TinyControl.Packet as Packet

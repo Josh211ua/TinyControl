@@ -9,7 +9,7 @@ module TinyControl.Server
   , close
   ) where
 
-import TinyControl.Common (Handle(..), Data(..), Addr(..), Friend)
+import TinyControl.Common (Handle(..), Data(..), Addr(..), Friend, makeTimeDiff)
 import qualified TinyControl.Common as C
 import qualified TinyControl.Packet as Packet
 
@@ -44,18 +44,6 @@ data ServerState = ServerState { rto :: TimeDiff
 
 type ServerStateMonad = RWST Int [String] ServerState IO
 
-
-makeTimeDiff :: Int -> TimeDiff
-makeTimeDiff sec =
-  TimeDiff {
-    tdYear = 0,
-    tdMonth = 0,
-    tdDay = 0,
-    tdHour = 0,
-    tdMin = 0,
-    tdSec = sec,
-    tdPicosec = 0
-  }
 
 open :: String -> IO (Handle ServerState)
 open port =
