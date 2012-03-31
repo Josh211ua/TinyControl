@@ -2,7 +2,6 @@ module TinyControl.Common
   ( Data(..)
   ,  Friend
   , Handle(..)
-  , Addr(..)
   , srecv
   , recv
   , send
@@ -35,12 +34,7 @@ import qualified Data.Set as Set
 
 type Data = [ByteString]
 
-data Addr = Addr { sock :: Socket
-                 , address :: SockAddr
-                 }
-                 deriving (Show)
-
-data Handle s = Handle { addr :: Addr
+data Handle s = Handle { sock :: Socket
                        , state :: s
                        }
                        deriving (Show)
@@ -62,33 +56,33 @@ makeTimeDiff sec =
 type MyRWST s a = RWST Int [String] s IO a
 
 srecv ::(Show s) => Handle s -> MyRWST s (Friend, Data) -> IO (Handle s, Friend, Data)
-srecv (Handle {addr = a , state = ss}) helper  = --error "recv not implemented"
+srecv (Handle {sock = s , state = ss}) helper  = --error "recv not implemented"
   withSocketsDo $
   do
     result <- runRWST helper 0 ss
     print $ show $ result
     let ((friend, val), state,_) = result
-    return $ (Handle {addr = a, state = state}, friend, val)
+    return $ (Handle {sock = s, state = state}, friend, val)
     -- Change addr to a new port
 
 recv ::(Show s) => Handle s -> MyRWST s (Friend, Data) -> IO (Handle s, Data)
-recv (Handle {addr = a , state = ss}) helper = --error "recv not implemented"
+recv (Handle {sock = a , state = ss}) helper = --error "recv not implemented"
   withSocketsDo $
   do
     result <- runRWST helper 0 ss
     print $ show $ result
     let ((_, val), state,_) = result
-    return $ (Handle {addr = a, state = state}, val)
+    return $ (Handle {sock = a, state = state}, val)
 
 send ::(Show s) => Handle s -> Friend -> Data -> MyRWST s (Handle s) -> IO (Handle s)
-send (Handle {addr = a , state = ss}) friend msg helper =
+send (Handle {sock = a , state = ss}) friend msg helper =
   withSocketsDo $
   do
     result <- runRWST helper 0 ss
     print $ show $ result
     let (_, state,_) = result
-    return $ (Handle {addr = a, state = state})
+    return $ (Handle {sock = a, state = state})
 
 
 close :: Handle s -> IO ()
-close (Handle {addr = Addr { sock = s, address = _} , state = _}) = sClose (s)
+close (Handle {sock = s , state = _}) = sClose (s)

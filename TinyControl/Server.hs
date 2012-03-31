@@ -9,7 +9,7 @@ module TinyControl.Server
   , close
   ) where
 
-import TinyControl.Common (Handle(..), Data(..), Addr(..), Friend, makeTimeDiff)
+import TinyControl.Common (Handle(..), Data(..), Friend, makeTimeDiff)
 import qualified TinyControl.Common as C
 import qualified TinyControl.Packet as Packet
 
@@ -57,9 +57,7 @@ open port =
 
        -- Establish a socket for communication
        theSock <- socket (addrFamily serveraddr) Datagram defaultProtocol
-
-       -- Save information into an Addr
-       let theAddr = Addr { sock=theSock, address=addrAddress serveraddr }
+       --let friend = addrAddress serveraddr
 
        -- Initailize State
        now <- getClockTime
@@ -73,7 +71,7 @@ open port =
             }
 
        -- Send back the handle
-       return $ Handle { addr=theAddr, state=theState }
+       return $ Handle { sock=theSock, state=theState }
 
 recieveHelper :: ServerStateMonad (Friend, Data) -- t m a
 recieveHelper = error "srecv not implemented"
