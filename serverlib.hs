@@ -8,8 +8,8 @@ module TinyControl.Server
   ) where
 
 import Data.ByteString (ByteString)
-import Network.Socket (Socket, SockAddr, getAddrInfo, socket)
-import Network.BSD (HostName)
+import Network.Socket (Socket, SockAddr, getAddrInfo, socket, addrFamily, SocketType(Datagram), addrAddress)
+import Network.BSD (HostName, defaultProtocol)
 import System.Time (TimeDiff, CalendarTime)
 import Data.Set (Set)
 
@@ -32,7 +32,7 @@ data Handle = Handle { addr :: Addr
 
 -- Hostname -> Port -> Handle
 open :: HostName -> String -> IO Handle
-open = error "open not implemented"
+--open = error "open not implemented"
 open hostname port =
     do -- Look up the hostname and port.  Either raises an exception
        -- or returns a nonempty list.  First element in that list
@@ -44,7 +44,7 @@ open hostname port =
        theSock <- socket (addrFamily serveraddr) Datagram defaultProtocol
 
        -- Save information into an Addr
-       let theAddr = Addr { sock=theSock, address=serveraddr }
+       let theAddr = Addr { sock=theSock, address=addrAddress serveraddr }
 
        -- Initailize State
        let theState = undefined-- TODO
