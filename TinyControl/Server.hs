@@ -3,11 +3,14 @@ module TinyControl.Server
   ,  Friend
   , Handle
   , open
+  , srecv
   , recv
   , send
   , close
   ) where
 
+import TinyControl.Common (Handle(..), Data(..), Addr(..), Friend)
+import qualified TinyControl.Common as C
 import qualified TinyControl.Packet as Packet
 
 import Control.Monad.Trans.Class (lift)
@@ -31,13 +34,6 @@ import System.Time (TimeDiff(..), CalendarTime, getClockTime, toCalendarTime)
 import Data.Set (Set)
 import qualified Data.Set as Set
 
-type Data = [ByteString]
-
-data Addr = Addr { sock :: Socket
-                 , address :: SockAddr
-                 }
-                 deriving (Show)
-
 data ServerState = ServerState { rto :: TimeDiff
                                , tld :: CalendarTime
                                , r :: Maybe TimeDiff
@@ -45,13 +41,6 @@ data ServerState = ServerState { rto :: TimeDiff
                                , x :: Int
                                }
                                deriving (Show, Read)
-
-data Handle s = Handle { addr :: Addr
-                       , state :: s
-                       }
-                       deriving (Show)
-
-type Friend = SockAddr
 
 type ServerStateMonad = RWST Int [String] ServerState IO
 
@@ -68,9 +57,7 @@ makeTimeDiff sec =
     tdPicosec = 0
   }
 
--- Hostname -> Port -> Handle
-open :: String -> IO Handle
---open = error "open not implemented"
+open :: String -> IO (Handle ServerState)
 open port =
     do -- Look up the hostname and port.  Either raises an exception
        -- or returns a nonempty list.  First element in that list
@@ -103,37 +90,14 @@ open port =
 recieveHelper :: ServerStateMonad (Friend, Data) -- t m a
 recieveHelper = error "srecv not implemented"
 
-srecv :: Handle -> IO (Handle, Friend, Data)
-recv (Handle {addr = a , state = ss})  = --error "recv not implemented"
-  withSocketsDo $
-  do
-    result <- runRWST receiveHelper 0 ss
-    print $ show $ result
-    let ((friend, val), state,_) = result
-    return $ (Handle {addr = a, state = state}, friend, val)
-    -- Change addr to a new port
+srecv :: Handle ServerState -> IO (Handle ServerState, Friend, Data)
+srecv h = C.srecv h recieveHelper
 
-recv :: Handle -> IO (Handle, Data)
-recv (Handle {addr = a , state = ss})  = --error "recv not implemented"
-  withSocketsDo $
-  do
-    result <- runRWST receiveHelper 0 ss
-    print $ show $ result
-    let ((_, val), state,_) = result
-    return $ (Handle {addr = a, state = state}, val)
+recv :: Handle ServerState -> IO (Handle ServerState, Data)
+recv h = C.recv h recieveHelper
 
-send :: Handle -> Friend -> Data -> IO (Handle)
-send (Handle {addr = a , state = ss}) friend msg =
-  withSocketsDo $
-  do
-    result <- runRWST helper 0 ss
-    print $ show $ result
-    let (_, state,_) = result
-    return $ (Handle {addr = a, state = state})
-  where
-    helper :: ServerStateMonad () -- t m a
-    helper = error "send not implemented"
+send :: Handle ServerState -> Friend -> Data -> IO (Handle ServerState)
+send h friend msg = C.send h friend msg (error "send not implemented")
 
-
-close :: Handle -> IO ()
-close (Handle {addr = Addr { sock = s, address = _} , state = _}) = sClose (s)
+close :: Handle ServerState -> IO ()
+close = C.close
