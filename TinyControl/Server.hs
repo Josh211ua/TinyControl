@@ -13,7 +13,17 @@ import Control.Monad.Trans.Class (lift)
 import Control.Monad.Trans.RWS.Lazy
 
 import Data.ByteString (ByteString)
-import Network.Socket (Socket, SockAddr, getAddrInfo, socket, addrFamily, SocketType(Datagram), addrAddress, withSocketsDo, sClose)
+import Network.Socket (
+  Socket
+  , SockAddr
+  , getAddrInfo
+  , socket
+  , SocketType(Datagram)
+  , withSocketsDo
+  , sClose
+  , AddrInfo(..)
+  , AddrInfoFlag(AI_PASSIVE)
+  , defaultHints)
 import Network.BSD (HostName, defaultProtocol)
 import System.Time (TimeDiff(..), CalendarTime, getClockTime, toCalendarTime)
 
@@ -56,13 +66,15 @@ makeTimeDiff sec =
   }
 
 -- Hostname -> Port -> Handle
-open :: HostName -> String -> IO Handle
+open :: String -> IO Handle
 --open = error "open not implemented"
-open hostname port =
+open port =
     do -- Look up the hostname and port.  Either raises an exception
        -- or returns a nonempty list.  First element in that list
        -- is supposed to be the best option.
-       addrinfos <- getAddrInfo Nothing (Just hostname) (Just port)
+       addrinfos <- getAddrInfo
+                      (Just (defaultHints {addrFlags = [AI_PASSIVE]}))
+                      Nothing (Just port)
        let serveraddr = head addrinfos
 
        -- Establish a socket for communication
