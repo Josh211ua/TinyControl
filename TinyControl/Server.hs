@@ -83,7 +83,10 @@ recv :: Handle ServerState -> IO (Handle ServerState, Friend, Data)
 recv h = C.recv h recieveHelper
 
 sendHelper :: ServerStateMonad (Socket,Friend,Data) (Handle ServerState)
-sendHelper = error "send not implemented"
+sendHelper = do
+    (sock, friend, msg) <- ask
+    lift $ C.sendstr sock friend (unpack msg)
+    error "sendHelper not implemented"
 
 send :: Handle ServerState -> Friend -> Data -> IO (Handle ServerState)
 send h friend msg = C.send h friend msg sendHelper
