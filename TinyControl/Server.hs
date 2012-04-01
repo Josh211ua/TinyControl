@@ -17,7 +17,7 @@ import Control.Monad.Trans.Class (lift)
 import Control.Monad.Trans.RWS.Lazy hiding (state)
 
 import Data.ByteString (ByteString)
-import Data.ByteString.Char8 (pack)
+import Data.ByteString.Char8 (pack, unpack)
 import Network.Socket (
   Socket
   , SockAddr
@@ -91,11 +91,10 @@ srecv h = C.srecv h recieveHelper
 recv :: Handle ServerState -> IO (Handle ServerState, Friend, Data)
 recv h = C.recv h recieveHelper
 
-sendHelper :: ServerStateMonad (Socket,Friend,Data) (Handle ServerState)
+sendHelper :: ServerStateMonad (Socket,Friend,Data) ()
 sendHelper = do
     (sock, friend, msg) <- ask
     lift $ C.sendstr sock friend (unpack msg)
-    error "sendHelper not implemented"
 
 send :: Handle ServerState -> Friend -> Data -> IO (Handle ServerState)
 send h friend msg = C.send h friend msg sendHelper
