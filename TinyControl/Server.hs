@@ -82,7 +82,7 @@ srecv h = C.srecv h recieveHelper
 recv :: Handle ServerState -> IO (Handle ServerState, Friend, Data)
 recv h = C.recv h recieveHelper
 
-sendHelper :: ServerStateMonad (Handle ServerState)
+sendHelper :: ServerStateMonad (Socket,Friend,Data) (Handle ServerState)
 sendHelper = error "send not implemented"
 
 send :: Handle ServerState -> Friend -> Data -> IO (Handle ServerState)
