@@ -51,7 +51,7 @@ Library
   Exposed-modules:     TinyControl.Server
 
   -- Packages needed in order to build this package.
-  Build-depends: base >= 4, containers, old-time, network, bytestring, transformers
+  Build-depends: base >= 4, containers, old-time, network, bytestring, transformers == 0.3.0.0
 
   -- Modules not exported by this package.
   Other-modules: TinyControl.Packet, TinyControl.Common
@@ -65,7 +65,7 @@ Executable server
   Main-is:             ServerApp.hs
 
   -- Packages needed in order to build this package.
-  Build-depends: base >= 4, containers, old-time, network, bytestring, transformers
+  Build-depends: base >= 4, containers, old-time, network, bytestring, transformers == 0.3.0.0
 
   -- Extra tools (e.g. alex, hsc2hs, ...) needed to build the source.
   -- Build-tools:         alex, happy

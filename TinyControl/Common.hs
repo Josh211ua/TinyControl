@@ -53,13 +53,13 @@ makeTimeDiff sec =
     tdPicosec = 0
   }
 
-type MyRWST s a = RWST Int [String] s IO a
+type MyRWST r s a = RWST r [String] s IO a
 
-srecv ::(Show s) => Handle s -> MyRWST s (Friend, Data) -> IO (Handle s, Friend, Data)
+srecv ::(Show s) => Handle s -> MyRWST (Socket) s (Friend, Data) -> IO (Handle s, Friend, Data)
 srecv (Handle {sock = s , state = ss}) helper  = --error "recv not implemented"
   withSocketsDo $
   do
-    result <- runRWST helper 0 ss
+    result <- runRWST helper s ss
     print $ show $ result
     let ((friend, val), state,_) = result
     addrinfos <- getAddrInfo
@@ -70,20 +70,20 @@ srecv (Handle {sock = s , state = ss}) helper  = --error "recv not implemented"
     return $ (Handle {sock = sock, state = state}, friend, val)
     -- Change addr to a new port
 
-recv ::(Show s) => Handle s -> MyRWST s (Friend, Data) -> IO (Handle s, Friend, Data)
+recv ::(Show s) => Handle s -> MyRWST (Socket) s (Friend, Data) -> IO (Handle s, Friend, Data)
 recv (Handle {sock = a , state = ss}) helper = --error "recv not implemented"
   withSocketsDo $
   do
-    result <- runRWST helper 0 ss
+    result <- runRWST helper a ss
     print $ show $ result
     let ((friend, val), state,_) = result
     return $ (Handle {sock = a, state = state}, friend, val)
 
-send ::(Show s) => Handle s -> Friend -> Data -> MyRWST s (Handle s) -> IO (Handle s)
+send ::(Show s) => Handle s -> Friend -> Data -> MyRWST (Socket,Friend,Data) s (Handle s) -> IO (Handle s)
 send (Handle {sock = a , state = ss}) friend msg helper =
   withSocketsDo $
   do
-    result <- runRWST helper 0 ss
+    result <- runRWST helper (a,friend,msg) ss
     print $ show $ result
     let (_, state,_) = result
     return $ (Handle {sock = a, state = state})

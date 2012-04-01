@@ -42,7 +42,7 @@ data ServerState = ServerState { rto :: TimeDiff
                                }
                                deriving (Show, Read)
 
-type ServerStateMonad = RWST Int [String] ServerState IO
+type ServerStateMonad r = RWST r [String] ServerState IO
 
 
 open :: String -> IO (Handle ServerState)
@@ -73,7 +73,7 @@ open port =
        -- Send back the handle
        return $ Handle { sock=theSock, state=theState }
 
-recieveHelper :: ServerStateMonad (Friend, Data) -- t m a
+recieveHelper :: ServerStateMonad (Socket) (Friend, Data) -- t m a
 recieveHelper = error "srecv not implemented"
 
 srecv :: Handle ServerState -> IO (Handle ServerState, Friend, Data)
