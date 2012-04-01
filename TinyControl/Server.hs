@@ -52,7 +52,7 @@ type ServerHandle = Handle ServerState
 type ServerStateMonad r = RWST r [String] ServerState IO
 
 
-open :: String -> IO (Handle ServerState)
+open :: String -> IO (ServerHandle)
 open port =
     do -- Look up the hostname and port.  Either raises an exception
        -- or returns a nonempty list.  First element in that list
@@ -91,10 +91,10 @@ recieveHelper = do
   let d = (pack msg)
   return (addr, d)
 
-srecv :: Handle ServerState -> IO (Handle ServerState, Friend, Data)
+srecv :: ServerHandle -> IO (ServerHandle, Friend, Data)
 srecv h = C.srecv h recieveHelper
 
-recv :: Handle ServerState -> IO (Handle ServerState, Friend, Data)
+recv :: ServerHandle -> IO (ServerHandle, Friend, Data)
 recv h = C.recv h recieveHelper
 
 sendHelper :: ServerStateMonad (Socket,Friend,Data) ()
@@ -104,8 +104,8 @@ sendHelper = do
     lift $ C.sendstr sock friend msg
     tell (["Send'd: " ++ msg])
 
-send :: Handle ServerState -> Friend -> Data -> IO (Handle ServerState)
+send :: ServerHandle -> Friend -> Data -> IO (ServerHandle)
 send h friend msg = C.send h friend msg sendHelper
 
-close :: Handle ServerState -> IO ()
+close :: ServerHandle -> IO ()
 close = C.close
