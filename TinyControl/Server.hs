@@ -17,6 +17,7 @@ import Control.Monad.Trans.Class (lift)
 import Control.Monad.Trans.RWS.Lazy hiding (state)
 
 import Data.ByteString (ByteString)
+import Data.ByteString.Char8 (pack)
 import Network.Socket (
   Socket
   , SockAddr
@@ -27,7 +28,8 @@ import Network.Socket (
   , sClose
   , AddrInfo(..)
   , AddrInfoFlag(AI_PASSIVE)
-  , defaultHints)
+  , defaultHints
+  , recvFrom)
 import Network.BSD (HostName, defaultProtocol)
 import System.Time (TimeDiff(..), CalendarTime, getClockTime, toCalendarTime)
 
@@ -74,7 +76,14 @@ open port =
        return $ Handle { sock=theSock, state=theState }
 
 recieveHelper :: ServerStateMonad (Socket) (Friend, Data) -- t m a
-recieveHelper = error "srecv not implemented"
+recieveHelper = do
+  sock <- ask
+  -- Receive one UDP packet, maximum length 1024 bytes,
+  -- and save its content into msg and its source
+  -- IP and port into addr
+  (msg, _, addr) <- lift (recvFrom sock 1024)
+  let d = (pack msg)
+  return (addr, d)
 
 srecv :: Handle ServerState -> IO (Handle ServerState, Friend, Data)
 srecv h = C.srecv h recieveHelper

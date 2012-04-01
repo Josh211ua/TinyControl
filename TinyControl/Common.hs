@@ -35,7 +35,7 @@ import Data.Set (Set)
 import Data.List (genericDrop)
 import qualified Data.Set as Set
 
-type Data = [ByteString]
+type Data = ByteString
 
 data Handle s = Handle { sock :: Socket
                        , state :: s
