@@ -105,10 +105,13 @@ recv h = C.recv h recieveHelper
       -- Receive one UDP packet, maximum length 1024 bytes,
       -- and save its content into msg and its source
       -- IP and port into addr
-      (msg, num, addr) <- lift (recvFrom sock 1024)
-      tell (["Recv'd: " ++ msg])
-      let d = (pack msg)
-      return (addr, d)
+      mresult <- lift $ timeout 5 (recvFrom sock 1024)
+      case mresult of
+        Nothing -> error "timer expired"
+        Just (msg, num, addr) -> do
+          tell (["Recv'd: " ++ msg])
+          let d = (pack msg)
+          return (addr, d)
 
 
 sendHelper :: ServerStateMonad (Socket,Friend,Data) ()
