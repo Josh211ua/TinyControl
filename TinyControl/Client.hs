@@ -31,7 +31,7 @@ import Network.Socket (
   , recvFrom)
 import Network.BSD (HostName, defaultProtocol)
 import System.Time (TimeDiff(..), CalendarTime, getClockTime, toCalendarTime)
-
+import System.Timeout(timeout)
 import Data.Set (Set)
 import qualified Data.Set as Set
 

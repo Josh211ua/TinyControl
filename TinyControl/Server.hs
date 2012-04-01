@@ -16,6 +16,8 @@ import qualified TinyControl.Packet as Packet
 import Control.Monad.Trans.Class (lift)
 import Control.Monad.Trans.RWS.Lazy hiding (state)
 
+import System.Timeout(timeout)
+
 import Data.ByteString (ByteString)
 import Data.ByteString.Char8 (pack, unpack)
 import Network.Socket (
