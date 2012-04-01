@@ -12,7 +12,7 @@ module TinyControl.Common
 import qualified TinyControl.Packet as Packet
 
 import Control.Monad.Trans.Class (lift)
-import Control.Monad.Trans.RWS.Lazy
+import Control.Monad.Trans.RWS.Lazy hiding (state)
 
 import Data.ByteString (ByteString)
 import Network.Socket (
