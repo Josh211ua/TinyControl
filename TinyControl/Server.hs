@@ -80,22 +80,36 @@ open port =
        -- Send back the handle
        return $ Handle { sock=theSock, state=theState }
 
-recieveHelper :: ServerStateMonad (Socket) (Friend, Data) -- t m a
-recieveHelper = do
-  sock <- ask
-  -- Receive one UDP packet, maximum length 1024 bytes,
-  -- and save its content into msg and its source
-  -- IP and port into addr
-  (msg, num, addr) <- lift (recvFrom sock 1024)
-  tell (["Recv'd: " ++ msg])
-  let d = (pack msg)
-  return (addr, d)
 
 srecv :: ServerHandle -> IO (ServerHandle, Friend, Data)
 srecv h = C.srecv h recieveHelper
+  where
+    recieveHelper :: ServerStateMonad (Socket) (Friend, Data) -- t m a
+    recieveHelper = do
+      sock <- ask
+      -- Receive one UDP packet, maximum length 1024 bytes,
+      -- and save its content into msg and its source
+      -- IP and port into addr
+      (msg, num, addr) <- lift (recvFrom sock 1024)
+      tell (["Recv'd: " ++ msg])
+      let d = (pack msg)
+      return (addr, d)
+
 
 recv :: ServerHandle -> IO (ServerHandle, Friend, Data)
 recv h = C.recv h recieveHelper
+  where
+    recieveHelper :: ServerStateMonad (Socket) (Friend, Data) -- t m a
+    recieveHelper = do
+      sock <- ask
+      -- Receive one UDP packet, maximum length 1024 bytes,
+      -- and save its content into msg and its source
+      -- IP and port into addr
+      (msg, num, addr) <- lift (recvFrom sock 1024)
+      tell (["Recv'd: " ++ msg])
+      let d = (pack msg)
+      return (addr, d)
+
 
 sendHelper :: ServerStateMonad (Socket,Friend,Data) ()
 sendHelper = do
