@@ -1,7 +1,7 @@
 module TinyControl.Server
   ( Data(..)
-  ,  Friend
-  , Handle
+  , Friend
+  , ServerHandle
   , open
   , srecv
   , recv
@@ -46,6 +46,8 @@ data ServerState = ServerState { rto :: TimeDiff
                                , x :: Int
                                }
                                deriving (Show, Read)
+
+type ServerHandle = Handle ServerState
 
 type ServerStateMonad r = RWST r [String] ServerState IO
 
