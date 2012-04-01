@@ -7,6 +7,7 @@ module TinyControl.Common
   , send
   , close
   , makeTimeDiff
+  , sendstr
   ) where
 
 import qualified TinyControl.Packet as Packet
@@ -20,6 +21,7 @@ import Network.Socket (
   , SockAddr
   , getAddrInfo
   , socket
+  , sendTo
   , SocketType(Datagram)
   , withSocketsDo
   , sClose
@@ -30,6 +32,7 @@ import Network.BSD (HostName, defaultProtocol)
 import System.Time (TimeDiff(..), CalendarTime, getClockTime, toCalendarTime)
 
 import Data.Set (Set)
+import Data.List (genericDrop)
 import qualified Data.Set as Set
 
 type Data = [ByteString]
@@ -87,6 +90,11 @@ send (Handle {sock = a , state = ss}) friend msg helper =
     print $ show $ result
     let (_, state,_) = result
     return $ (Handle {sock = a, state = state})
+
+sendstr :: Socket -> Friend -> String -> IO ()
+sendstr _ _ [] = return ()
+sendstr sock friend omsg = do sent <- sendTo sock omsg friend
+                              sendstr sock friend (genericDrop sent omsg)
 
 
 close :: Handle s -> IO ()
