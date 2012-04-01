@@ -5,7 +5,8 @@ import Data.ByteString.Char8 (pack)
 main =
   do
     (h,f) <- open "localhost" "1514"
-    putStrLn "sending \"hello, world\""
+    putStrLn ("opened handle:" ++ show h)
+    putStrLn ("sending \"hello, world\" to " ++ show f)
     handle <- send h f (pack "hello, world")
     putStrLn "waiting for a message from server"
     (handle, friend, msg) <- recv h
