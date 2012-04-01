@@ -81,7 +81,8 @@ recieveHelper = do
   -- Receive one UDP packet, maximum length 1024 bytes,
   -- and save its content into msg and its source
   -- IP and port into addr
-  (msg, _, addr) <- lift (recvFrom sock 1024)
+  (msg, num, addr) <- lift (recvFrom sock 1024)
+  tell (["Recv'd: " ++ msg])
   let d = (pack msg)
   return (addr, d)
 
@@ -93,8 +94,10 @@ recv h = C.recv h recieveHelper
 
 sendHelper :: ServerStateMonad (Socket,Friend,Data) ()
 sendHelper = do
-    (sock, friend, msg) <- ask
-    lift $ C.sendstr sock friend (unpack msg)
+    (sock, friend, d) <- ask
+    let msg = unpack d
+    lift $ C.sendstr sock friend msg
+    tell (["Send'd: " ++ msg])
 
 send :: Handle ServerState -> Friend -> Data -> IO (Handle ServerState)
 send h friend msg = C.send h friend msg sendHelper
