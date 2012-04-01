@@ -5,9 +5,9 @@ import Data.ByteString.Char8 (pack)
 main =
   do
     (h,f) <- open "localhost" "1514"
-    print "sending \"hello, world\"\n"
+    putStrLn "sending \"hello, world\""
     handle <- send h f (pack "hello, world")
-    print "waiting for a message from server\n"
+    putStrLn "waiting for a message from server"
     (handle, friend, msg) <- recv h
-    print ("received this message: " ++ show msg ++ "\n")
+    putStrLn ("received this message: " ++ show msg)
     close h
