@@ -28,8 +28,6 @@ import Network.Socket (
   , AddrInfo(..)
   , AddrInfoFlag(AI_PASSIVE)
   , defaultHints
-  , getPeerName
-  , getSocketName
   , getNameInfo)
 import Network.BSD (HostName, defaultProtocol)
 import System.Time (TimeDiff(..), CalendarTime, getClockTime, toCalendarTime)
@@ -65,9 +63,6 @@ srecv ::(Show s) => Handle s -> MyRWST (Socket) s (Friend, Data) -> IO (Handle s
 srecv (Handle {sock = s , state = ss}) helper  = --error "recv not implemented"
   withSocketsDo $
   do
-    --peer <- getPeerName s
-    name <- getSocketName s
-    putStrLn ("sreceiving on socket: " ++ show s ++ show name)
     result <- runRWST helper s ss
     let ((friend, val), state,_) = result
     --addrinfos <- getAddrInfo (Just (defaultHints {addrFlags = [AI_PASSIVE]})) Nothing Nothing
@@ -83,9 +78,6 @@ recv ::(Show s) => Handle s -> MyRWST (Socket) s (Friend, Data) -> IO (Handle s,
 recv (Handle {sock = a , state = ss}) helper = --error "recv not implemented"
   withSocketsDo $
   do
-    --peer <- getPeerName a
-    name <- getSocketName a
-    putStrLn ("receiving on socket: " ++ show a ++ show name)
     result <- runRWST helper a ss
     let ((friend, val), state,_) = result
     return $ (Handle {sock = a, state = state}, friend, val)
@@ -94,9 +86,6 @@ send ::(Show s) => Handle s -> Friend -> Data -> MyRWST (Socket,Friend,Data) s (
 send (Handle {sock = a , state = ss}) friend msg helper =
   withSocketsDo $
   do
-    --peer <- getPeerName a
-    name <- getSocketName a
-    putStrLn ("sending on socket: " ++ show a ++ show name)
     result <- runRWST helper (a,friend,msg) ss
     let (_, state,_) = result
     return $ (Handle {sock = a, state = state})

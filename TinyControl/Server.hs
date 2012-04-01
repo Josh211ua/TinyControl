@@ -30,7 +30,6 @@ import Network.Socket (
   , AddrInfoFlag(AI_PASSIVE)
   , defaultHints
   , recvFrom
-  , getSocketName
   , bindSocket)
 import Network.BSD (HostName, defaultProtocol)
 import System.Time (TimeDiff(..), CalendarTime, getClockTime, toCalendarTime)
@@ -83,8 +82,6 @@ recieveHelper = do
   -- Receive one UDP packet, maximum length 1024 bytes,
   -- and save its content into msg and its source
   -- IP and port into addr
-  name <- lift $ getSocketName sock
-  lift $ putStrLn ("receiveHelper on socket " ++ show sock ++ " " ++ show name)
   (msg, num, addr) <- lift (recvFrom sock 1024)
   tell (["Recv'd: " ++ msg])
   let d = (pack msg)
