@@ -1,11 +1,6 @@
 module TinyControl.Client
   ( Data(..)
-  ,  Friend
-  , Handle
-  , open
-  , recv
-  , send
-  , close
+  , wantData
   ) where
 
 import TinyControl.Common (Handle(..), Data(..), Friend, makeTimeDiff)
@@ -44,6 +39,9 @@ data ClientState = ClientState { rto :: TimeDiff
                                deriving (Show, Read)
 
 type ClientStateMonad r = RWST r [String] ClientState IO
+
+wantData :: String -> String -> Data -> IO Data
+wantData host port msg = error "Not implemented"
 
 
 open :: String -> String -> IO (Handle ClientState, Friend)
