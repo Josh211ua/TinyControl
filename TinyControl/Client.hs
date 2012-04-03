@@ -6,11 +6,12 @@ module TinyControl.Client
 import TinyControl.Common (Handle(..), Data(..), Friend, makeTimeDiff)
 import qualified TinyControl.Common as C
 import qualified TinyControl.Packet as Packet
+import TinyControl.Packet (DataPacket)
 
 import Control.Monad.Trans.Class (lift)
 import Control.Monad.Trans.RWS.Lazy hiding (state)
 
-import Data.ByteString (ByteString)
+import Data.ByteString (ByteString, append)
 import Data.ByteString.Char8 (pack, unpack)
 import Network.Socket (
   Socket
@@ -40,45 +41,80 @@ data ClientState = ClientState { rto :: TimeDiff
 
 type ClientHandle = Handle ClientState
 
-type ClientStateMonad r = RWST r [String] ClientState IO
+type ClientStateMonad r = RWST r ByteString ClientState IO
 
 wantData :: String -> String -> Data -> IO Data
 wantData host port msg = do
     x <- open host port
     let (h@(Handle{sock = s, state = ss}), friend) = x
-    send s friend msg
+    send s friend (unpack msg)
     recvAll ( h ) friend
 
 recvAll :: ClientHandle -> Friend -> IO Data
 recvAll (Handle {sock = s, state = ss}) friend = do
-    (d, _, _) <- runRWST (m1 (timeout 1 (recv s))) (s, friend) ss
-    return d
+    (_, _, w) <- runRWST (m1 (timeout (getTimeout ss) (recv s))) (s, friend) ss
+    return w
 
-m1 :: IO (Maybe (Friend, Data)) -> ClientStateMonad (Socket, Friend) (Data)
+m1 :: IO (Maybe (Friend, String)) -> ClientStateMonad (Socket, Friend) ()
 m1 result = do
-    d <- lift result
-    error "fail"
-        
---    m1 (handle, friend)
---    where
---        m1 :: ClientStateMonad (Socket, Friend)
---        m1 = do
---            (handle, friend) <- ask
---            maybe <- timeout (undefined) $ recv handle
---            case maybe of
---                 Just(h, f, msg) -> -- doSomething
---                    m2
---                 None -> -- doSomething
---                    m3
---        m2 :: ClientStateMonad (Socket, Friend)
---        m2 = do
---
---        m3 :: ClientStateMonad (Socket, Friend)
---        m3 = do
---            (handle, friend) <- ask
---            (h, f, msg) <- recv handle
---            -- Do Something
---            m1 (h, f)
+    (sock, f) <- ask
+    ss <- get
+    maybeD <- lift result
+    case (maybeD) of
+         Just (_, d) -> do
+             let p = read d
+             gotDataPacket p
+             m2 (timeout (getTimeout ss) (recv sock))
+         Nothing -> do
+             expireFeedbackTimer
+             m3 (timeout (getTimeout ss) (recv sock))
+    
+m2 :: IO (Maybe (Friend, String)) -> ClientStateMonad (Socket, Friend) ()
+m2 result = do
+    (sock, f) <- ask
+    ss <- get
+    maybeD <- lift result
+    case (maybeD) of
+         Just (_, d) -> do
+             let p = read d
+             gotDataPacket p
+             m2 (timeout (getTimeout ss) (recv sock))
+         Nothing -> do
+             expireFeedbackTimer
+             sendFeedbackPacket
+             m3 (timeout (getTimeout ss) (recv sock))
+
+m3 :: IO (Maybe (Friend, String)) -> ClientStateMonad (Socket, Friend) ()
+m3 result = do
+    (sock, f) <- ask
+    ss <- get
+    maybeD <- lift result
+    case (maybeD) of
+         Just (_, d) -> do
+             let p = read d
+             gotDataPacket p
+             m1 (timeout (getTimeout ss) (recv sock))
+         Nothing -> do
+             expireFeedbackTimer
+             m3 (timeout (getTimeout ss) (recv sock))
+
+getTimeout :: ClientState -> Int
+getTimeout = error "getTimeout not implemented"
+
+makeDataPacket :: String -> DataPacket
+makeDataPacket d = error "makeFeedbackPacket not implemented"
+
+gotDataPacket :: DataPacket -> ClientStateMonad (Socket, Friend) ()
+gotDataPacket p = do
+    tell (Packet.payload p)
+    error "gotDataPacket not implemented"
+
+expireFeedbackTimer :: ClientStateMonad (Socket, Friend) ()
+expireFeedbackTimer = error "expireFeedbackTimer not implemented"
+
+sendFeedbackPacket :: ClientStateMonad (Socket, Friend) ()
+sendFeedbackPacket = error "sendFeedbackPacket not implemented"
+
 
 open :: String -> String -> IO (Handle ClientState, Friend)
 open hostname port =
@@ -106,11 +142,10 @@ open hostname port =
        -- Send back the handle
        return $ (Handle { sock=theSock, state=theState }, addrAddress serveraddr)
 
-recv :: Socket -> IO (Friend, Data)
+recv :: Socket -> IO (Friend, String)
 recv sock = do
     (msg, _, addr) <- recvFrom sock 1024
-    let d = (pack msg)
-    return (addr, d)
+    return (addr, msg)
 
 -- recieveHelper :: ClientStateMonad (Socket) (Friend, Data) -- t m a
 -- recieveHelper = do
@@ -125,8 +160,8 @@ recv sock = do
 -- recv :: Handle ClientState -> IO (Handle ClientState, Friend, Data)
 -- recv h = C.recv h recieveHelper
 
-send :: Socket -> Friend -> Data -> IO ()
-send sock friend msg = C.sendstr sock friend (unpack msg)
+send :: Socket -> Friend -> String -> IO ()
+send sock friend msg = C.sendstr sock friend msg
 
 -- sendHelper :: ClientStateMonad (Socket,Friend,Data) ()
 -- sendHelper = do

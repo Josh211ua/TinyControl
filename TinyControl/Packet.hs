@@ -11,7 +11,7 @@ import Data.ByteString (ByteString)
 data DataPacket = DataPacket { seqNum :: Int
                              , timeStamp :: CalendarTime
                              , rtt :: TimeDiff
-                             , payload :: [ByteString]
+                             , payload :: ByteString
                              } deriving (Show, Read)
 
 data FeedbackPacket = FeedbackPacket { t_recvdata :: CalendarTime
