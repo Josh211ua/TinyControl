@@ -38,10 +38,20 @@ data ClientState = ClientState { rto :: TimeDiff
                                }
                                deriving (Show, Read)
 
+type ClientHandle = Handle ClientState
+
 type ClientStateMonad r = RWST r [String] ClientState IO
 
 wantData :: String -> String -> Data -> IO Data
-wantData host port msg = error "Not implemented"
+wantData host port msg = do
+    x <- open host port
+    let (handle, friend) = x
+    handle <- send handle friend msg
+    recvAll handle friend
+
+recvAll :: ClientHandle -> Friend -> IO Data
+recvAll handle friend = error "recvAll not initialized"
+
 
 
 open :: String -> String -> IO (Handle ClientState, Friend)
