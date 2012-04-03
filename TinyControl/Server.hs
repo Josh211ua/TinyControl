@@ -1,12 +1,6 @@
 module TinyControl.Server
-  ( Data(..)
-  , Friend
-  , ServerHandle
-  , open
-  , srecv
-  , recv
-  , send
-  , close
+  ( Data(..),
+    serveData
   ) where
 
 import TinyControl.Common (Handle(..), Data(..), Friend, makeTimeDiff)
@@ -17,6 +11,7 @@ import Control.Monad.Trans.Class (lift)
 import Control.Monad.Trans.RWS.Lazy hiding (state)
 
 import System.Timeout(timeout)
+import Control.Concurrent(myThreadId, forkIO)
 
 import Data.ByteString (ByteString)
 import Data.ByteString.Char8 (pack, unpack)
@@ -50,7 +45,24 @@ data ServerState = ServerState { rto :: TimeDiff
 type ServerHandle = Handle ServerState
 
 type ServerStateMonad r = RWST r [String] ServerState IO
+type HandlerFunction = Data -> IO Data
 
+serveData :: String -> HandlerFunction -> IO ()
+serveData port f = do
+  h <- open port
+  serve h
+  where
+    serve :: ServerHandle -> IO ()
+    serve h = do
+      (handle, friend, msg) <- srecv h
+      threadId <- forkIO (serverThread handle friend msg)
+      serve h
+    serverThread :: ServerHandle -> Friend -> Data -> IO ()
+    serverThread handle friend msg = do
+      myId <- myThreadId
+      resp <- f msg
+      handle <- send handle friend resp
+      close handle
 
 open :: String -> IO (ServerHandle)
 open port =
