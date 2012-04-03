@@ -45,8 +45,8 @@ type ClientStateMonad r = RWST r [String] ClientState IO
 wantData :: String -> String -> Data -> IO Data
 wantData host port msg = do
     (handle, friend) <- open host port
-    handle <- send handle friend msg
-    recvAll handle friend
+    handle' <- send handle friend msg
+    recvAll handle' friend
 
 recvAll :: ClientHandle -> Friend -> IO Data
 recvAll handle friend = error "recvAll not initialized"
