@@ -78,18 +78,18 @@ initialState dp t_delay_start = ClientState {
    , x_recv = 0
    }
 
-receiveNextPacket :: Socket -> ClientState -> IO (Maybe (Friend, String))
+receiveNextPacket :: Socket -> ClientState -> IO (Maybe (String, Int, SockAddr))
 receiveNextPacket sock ss = do
     timeoutInterval <- getTimeout (nextTimeoutTime ss)
-    timeout timeoutInterval (recv sock)
+    timeout timeoutInterval (recvFrom sock P.dataPacketSize)
 
-m1 :: IO (Maybe (Friend, String)) -> ClientStateMonad (Socket, Friend) ()
+m1 :: IO (Maybe (String, Int, SockAddr)) -> ClientStateMonad (Socket, Friend) ()
 m1 result = do
     (sock, f) <- ask
     ss <- get
     maybeD <- lift result
     case (maybeD) of
-         Just (_, d) -> do
+         Just (d, _, _) -> do
              let p = read d
              gotDataPacket p
              let nextPacket = receiveNextPacket sock ss
@@ -99,13 +99,13 @@ m1 result = do
              let nextPacket = receiveNextPacket sock ss
              m3 nextPacket
     
-m2 :: IO (Maybe (Friend, String)) -> ClientStateMonad (Socket, Friend) ()
+m2 :: IO (Maybe (String, Int, SockAddr)) -> ClientStateMonad (Socket, Friend) ()
 m2 result = do
     (sock, f) <- ask
     ss <- get
     maybeD <- lift result
     case (maybeD) of
-         Just (_, d) -> do
+         Just (d, _, _) -> do
              let p = read d
              gotDataPacket p
              let nextPacket = receiveNextPacket sock ss
@@ -116,13 +116,13 @@ m2 result = do
              let nextPacket = receiveNextPacket sock ss
              m3 nextPacket
 
-m3 :: IO (Maybe (Friend, String)) -> ClientStateMonad (Socket, Friend) ()
+m3 :: IO (Maybe (String, Int, SockAddr)) -> ClientStateMonad (Socket, Friend) ()
 m3 result = do
     (sock, f) <- ask
     ss <- get
     maybeD <- lift result
     case (maybeD) of
-         Just (_, d) -> do
+         Just (d, _, _) -> do
              let p = read d
              gotDataPacket p
              lift $ makeAndSendFeedbackPacket sock f ss
@@ -176,10 +176,10 @@ open hostname port =
        -- Send back the handle
        return (theSock, addrAddress serveraddr)
 
-recv :: Socket -> IO (Friend, String)
-recv sock = do
-    (msg, _, addr) <- recvFrom sock 1024
-    return (addr, msg)
+-- recv :: Socket -> IO (Friend, String)
+-- recv sock = do
+--     (msg, _, addr) <- recvFrom sock 1024
+--     return (addr, msg)
 
 send :: Socket -> Friend -> String -> IO ()
 send sock friend msg = C.sendstr sock friend msg
