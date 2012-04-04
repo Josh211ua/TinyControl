@@ -145,10 +145,10 @@ sendFeedbackPacket sock friend packet = do
 gotDataPacket :: DataPacket -> ClientStateMonad (Socket, Friend) ()
 gotDataPacket p = do
     tell (P.payload p)
-    error "gotDataPacket not implemented"
+    return ()
 
 expireFeedbackTimer :: ClientStateMonad (Socket, Friend) ()
-expireFeedbackTimer = error "expireFeedbackTimer not implemented"
+expireFeedbackTimer = do return ()
 
 open :: String -> String -> IO (Socket, Friend)
 open hostname port =
