@@ -4,6 +4,7 @@ module TinyControl.Server
   ) where
 
 import TinyControl.Common (Handle(..), Data(..), Friend, makeTimeDiff)
+import qualified TinyControl.Common as C
 import qualified TinyControl.Packet as P
 import qualified TinyControl.Time as T
 
@@ -63,13 +64,14 @@ serveData port f = do
     serverThread handle friend msg = do
       myId <- myThreadId
       resp <- f msg
+      now <- T.now
       let rmsg = P.DataPacket {
-          seqNum = 0,
-          timeStamp = T.now,
-          rtt = 0,
-          payload = resp
+          P.seqNum = 0,
+          P.timeStamp = now,
+          P.rtt = 0,
+          P.payload = resp
           }
-      handle <- send handle friend resp
+      handle <- send handle friend (show rmsg)
       close handle
 
 --data DataPacket = DataPacket { seqNum :: Int
@@ -157,23 +159,26 @@ recv h@(Handle {sock = a, state = ss}) =   withSocketsDo $
           return (addr, d)
 
 
-send :: ServerHandle -> Friend -> Data -> IO (ServerHandle)
-send h@(Handle {sock = a, state = ss}) friend msg = withSocketsDo $
-  do
-    result <- runRWST sendHelper (a,friend,msg) ss
-    let (_, state,_) = result
-    return $ (Handle {sock = a, state = state})
-  where
-    sendHelper :: ServerStateMonad (Socket,Friend,Data) ()
-    sendHelper = do
-        (sock, friend, d) <- ask
-        let msg = unpack d
-        lift $ sendstr sock friend msg
-        tell (["Send'd: " ++ msg])
-    sendstr :: Socket -> Friend -> String -> IO ()
-    sendstr _ _ [] = return ()
-    sendstr sock friend omsg = do sent <- sendTo sock omsg friend
-                                  sendstr sock friend (genericDrop sent omsg)
+send :: ServerHandle -> Friend -> String -> IO (ServerHandle)
+send h@(Handle {sock = a, state = ss}) friend msg = do
+  C.sendstr a friend msg
+  return h
+
+  --do
+  --  result <- runRWST sendHelper (a,friend,msg) ss
+  --  let (_, state,_) = result
+  --  return $ (Handle {sock = a, state = state})
+  --where
+  --  sendHelper :: ServerStateMonad (Socket,Friend,Data) ()
+  --  sendHelper = do
+  --      (sock, friend, d) <- ask
+  --      let msg = unpack d
+  --      lift $ sendstr sock friend msg
+  --      tell (["Send'd: " ++ msg])
+  --  sendstr :: Socket -> Friend -> String -> IO ()
+  --  sendstr _ _ [] = return ()
+  --  sendstr sock friend omsg = do sent <- sendTo sock omsg friend
+  --                                sendstr sock friend (genericDrop sent omsg)
 
 
 
