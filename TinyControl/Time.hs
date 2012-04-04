@@ -3,9 +3,13 @@ module TinyControl.Time
   , usToDiffTime
   , nextTimeout
   , getTimeout
+  , now
   ) where
 
 import Data.Time.Clock
+
+now :: IO UTCTime
+now = getCurrentTime
 
 -- Converts seconds into microseconds
 toUs :: Int -> Integer
@@ -30,7 +34,7 @@ nextTimeout us = do
 getTimeout :: UTCTime -> IO Int
 getTimeout t = do
     now <- getCurrentTime
-    let diff = now `diffUTCTime` t 
+    let diff = now `diffUTCTime` t
     let realDiff = floor $ (toRational diff) * 1000 * 1000
     if realDiff < 0
        then return 0

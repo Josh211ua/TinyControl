@@ -4,7 +4,8 @@ module TinyControl.Server
   ) where
 
 import TinyControl.Common (Handle(..), Data(..), Friend, makeTimeDiff)
-import qualified TinyControl.Packet as Packet
+import qualified TinyControl.Packet as P
+import qualified TinyControl.Time as T
 
 import Control.Monad.Trans.Class (lift)
 import Control.Monad.Trans.RWS.Lazy hiding (state)
@@ -62,8 +63,20 @@ serveData port f = do
     serverThread handle friend msg = do
       myId <- myThreadId
       resp <- f msg
+      let rmsg = P.DataPacket {
+          seqNum = 0,
+          timeStamp = T.now,
+          rtt = 0,
+          payload = resp
+          }
       handle <- send handle friend resp
       close handle
+
+--data DataPacket = DataPacket { seqNum :: Int
+--                             , timeStamp :: UTCTime
+--                             , rtt :: Int
+--                             , payload :: ByteString
+
 
 open :: String -> IO (ServerHandle)
 open port =
@@ -87,7 +100,7 @@ open port =
             tld = calNow,
             r = Nothing,
             x_recvset = Set.empty,
-            x = Packet.s
+            x = P.s
             }
 
        -- Send back the handle
