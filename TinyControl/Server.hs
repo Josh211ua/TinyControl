@@ -4,7 +4,6 @@ module TinyControl.Server
   ) where
 
 import TinyControl.Common (Handle(..), Data(..), Friend, makeTimeDiff)
-import qualified TinyControl.Common as C
 import qualified TinyControl.Packet as Packet
 
 import Control.Monad.Trans.Class (lift)
@@ -23,17 +22,19 @@ import Network.Socket (
   , SocketType(Datagram)
   , withSocketsDo
   , sClose
+  , sendTo
   , AddrInfo(..)
   , AddrInfoFlag(AI_PASSIVE)
   , defaultHints
   , recvFrom
-  , bindSocket)
+  , bindSocket
+  , getNameInfo)
 import Network.BSD (HostName, defaultProtocol)
 import System.Time (TimeDiff(..), CalendarTime, getClockTime, toCalendarTime)
 
 import Data.Set (Set)
 import qualified Data.Set as Set
-
+import Data.List (genericDrop)
 data ServerState = ServerState { rto :: TimeDiff
                                , tld :: CalendarTime
                                , r :: Maybe TimeDiff
@@ -94,10 +95,23 @@ open port =
 
 
 srecv :: ServerHandle -> IO (ServerHandle, Friend, Data)
-srecv h = C.srecv h recieveHelper
+srecv h@(Handle {sock = s , state = ss}) =
+  withSocketsDo $
+  do
+    result <- runRWST receiveHelper s ss
+    let ((friend, val), state,_) = result
+    --addrinfos <- getAddrInfo (Just (defaultHints {addrFlags = [AI_PASSIVE]})) Nothing Nothing
+    (host, service) <- getNameInfo [] True True friend
+    addrinfos <- getAddrInfo (Just defaultHints) host service
+    let serveraddr = head addrinfos
+     -- Establish a socket for communication
+    sock <- socket (addrFamily serveraddr) Datagram defaultProtocol
+    return $ (Handle {sock = sock, state = state}, friend, val)
+    -- Change addr to a new port
+
   where
-    recieveHelper :: ServerStateMonad (Socket) (Friend, Data) -- t m a
-    recieveHelper = do
+    receiveHelper :: ServerStateMonad (Socket) (Friend, Data) -- t m a
+    receiveHelper = do
       sock <- ask
       -- Receive one UDP packet, maximum length 1024 bytes,
       -- and save its content into msg and its source
@@ -109,10 +123,14 @@ srecv h = C.srecv h recieveHelper
 
 
 recv :: ServerHandle -> IO (ServerHandle, Friend, Data)
-recv h = C.recv h recieveHelper
+recv h@(Handle {sock = a, state = ss}) =   withSocketsDo $
+  do
+    ((friend, val), state,_) <- runRWST receiveHelper a ss
+    return $ (Handle {sock = a, state = state}, friend, val)
+
   where
-    recieveHelper :: ServerStateMonad (Socket) (Friend, Data) -- t m a
-    recieveHelper = do
+    receiveHelper :: ServerStateMonad (Socket) (Friend, Data) -- t m a
+    receiveHelper = do
       sock <- ask
       -- Receive one UDP packet, maximum length 1024 bytes,
       -- and save its content into msg and its source
@@ -126,15 +144,25 @@ recv h = C.recv h recieveHelper
           return (addr, d)
 
 
-sendHelper :: ServerStateMonad (Socket,Friend,Data) ()
-sendHelper = do
-    (sock, friend, d) <- ask
-    let msg = unpack d
-    lift $ C.sendstr sock friend msg
-    tell (["Send'd: " ++ msg])
-
 send :: ServerHandle -> Friend -> Data -> IO (ServerHandle)
-send h friend msg = C.send h friend msg sendHelper
+send h@(Handle {sock = a, state = ss}) friend msg = withSocketsDo $
+  do
+    result <- runRWST sendHelper (a,friend,msg) ss
+    let (_, state,_) = result
+    return $ (Handle {sock = a, state = state})
+  where
+    sendHelper :: ServerStateMonad (Socket,Friend,Data) ()
+    sendHelper = do
+        (sock, friend, d) <- ask
+        let msg = unpack d
+        lift $ sendstr sock friend msg
+        tell (["Send'd: " ++ msg])
+    sendstr :: Socket -> Friend -> String -> IO ()
+    sendstr _ _ [] = return ()
+    sendstr sock friend omsg = do sent <- sendTo sock omsg friend
+                                  sendstr sock friend (genericDrop sent omsg)
+
+
 
 close :: ServerHandle -> IO ()
-close = C.close
+close (Handle {sock = s , state = _}) = sClose (s)

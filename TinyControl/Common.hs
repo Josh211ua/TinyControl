@@ -78,8 +78,7 @@ recv ::(Show s) => Handle s -> MyRWST (Socket) s (Friend, Data) -> IO (Handle s,
 recv (Handle {sock = a , state = ss}) helper = --error "recv not implemented"
   withSocketsDo $
   do
-    result <- runRWST helper a ss
-    let ((friend, val), state,_) = result
+    ((friend, val), state,_) <- runRWST helper a ss
     return $ (Handle {sock = a, state = state}, friend, val)
 
 send ::(Show s) => Handle s -> Friend -> Data -> MyRWST (Socket,Friend,Data) s () -> IO (Handle s)
