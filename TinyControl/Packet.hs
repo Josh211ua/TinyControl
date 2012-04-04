@@ -21,8 +21,12 @@ data FeedbackPacket = FeedbackPacket { t_recvdata :: UTCTime
                                      , p :: Float
                                      } deriving (Show, Read)
 
+-- s = payload size
 s::Int
 s = 1000
 
 dataPacketSize :: Int
 dataPacketSize = 1012
+
+isLastDataPacket :: DataPacket -> Bool
+isLastDataPacket p = (length $ payload p) < s

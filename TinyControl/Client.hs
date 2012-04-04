@@ -27,6 +27,7 @@ import Network.Socket (
   , recvFrom)
 import Network.BSD (HostName, defaultProtocol)
 import System.Timeout(timeout)
+import Data.Time (UTCTime, getCurrentTime)
 import Data.Set (Set)
 import qualified Data.Set as Set
 
@@ -40,14 +41,23 @@ wantData :: String -> String -> Data -> IO Data
 wantData host port msg = do
     (sock, friend) <- open host port
     send sock friend (unpack msg)
-    recvAll sock friend
+    firstPacket sock
 
-recvAll :: Socket -> Friend -> IO Data
-recvAll s friend = do
-    let ss = initialState
-    (_, _, w) <- runRWST (m1 (timeout (getTimeout ss) (recv s))) (s, friend) ss
-    return w
+firstPacket :: Socket -> IO Data
+firstPacket sock = do
+    (msg, _, friend) <- recvFrom sock Packet.dataPacketSize
+    t_delay_start <- getCurrentTime
+    -- read data packet
+    let packet = read msg
+    -- initialize state from pack
+    let ss = initialState 
+    -- send Feedback Packet
+    -- determine timeout interval
+    -- begin running through states
+    (_, _, w) <- runRWST (m1 (timeout (getTimeout ss) (recv sock))) (sock, friend) ss
+    return $ (Packet.payload packet) `append` w
 
+initialState :: ClientState
 initialState = ClientState { a = () }
 
 m1 :: IO (Maybe (Friend, String)) -> ClientStateMonad (Socket, Friend) ()
