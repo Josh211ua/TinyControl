@@ -3,10 +3,12 @@ module TinyControl.Packet
           DataPacket(..)
         , FeedbackPacket(..)
         , s
-        , dataPacketSize)
+        , dataPacketSize
+        , isLastDataPacket)
     where
 
 import Data.ByteString (ByteString)
+import qualified Data.ByteString as B
 import Data.Time (UTCTime)
 
 data DataPacket = DataPacket { seqNum :: Int
@@ -29,4 +31,4 @@ dataPacketSize :: Int
 dataPacketSize = 1012
 
 isLastDataPacket :: DataPacket -> Bool
-isLastDataPacket p = (length $ payload p) < s
+isLastDataPacket p = (B.length $ payload p) < s

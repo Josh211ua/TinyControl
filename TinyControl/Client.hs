@@ -5,7 +5,7 @@ module TinyControl.Client
 
 import TinyControl.Common (Handle(..), Data(..), Friend, makeTimeDiff)
 import qualified TinyControl.Common as C
-import qualified TinyControl.Packet as Packet
+import qualified TinyControl.Packet as P
 import TinyControl.Packet (DataPacket)
 
 import Control.Monad.Trans.Class (lift)
@@ -45,17 +45,20 @@ wantData host port msg = do
 
 firstPacket :: Socket -> IO Data
 firstPacket sock = do
-    (msg, _, friend) <- recvFrom sock Packet.dataPacketSize
+    (msg, _, friend) <- recvFrom sock P.dataPacketSize
     t_delay_start <- getCurrentTime
     -- read data packet
     let packet = read msg
-    -- initialize state from pack
-    let ss = initialState 
-    -- send Feedback Packet
-    -- determine timeout interval
-    -- begin running through states
-    (_, _, w) <- runRWST (m1 (timeout (getTimeout ss) (recv sock))) (sock, friend) ss
-    return $ (Packet.payload packet) `append` w
+    if P.isLastDataPacket packet
+       then return $ P.payload packet
+       else do
+         -- initialize state from pack
+         let ss = initialState 
+         -- send Feedback Packet
+         -- determine timeout interval
+         -- begin running through states
+         (_, _, w) <- runRWST (m1 (timeout (getTimeout ss) (recv sock))) (sock, friend) ss
+         return $ (P.payload packet) `append` w
 
 initialState :: ClientState
 initialState = ClientState { a = () }
@@ -111,7 +114,7 @@ makeDataPacket d = error "makeFeedbackPacket not implemented"
 
 gotDataPacket :: DataPacket -> ClientStateMonad (Socket, Friend) ()
 gotDataPacket p = do
-    tell (Packet.payload p)
+    tell (P.payload p)
     error "gotDataPacket not implemented"
 
 expireFeedbackTimer :: ClientStateMonad (Socket, Friend) ()
