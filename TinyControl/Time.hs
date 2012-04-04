@@ -4,6 +4,7 @@ module TinyControl.Time
   , nextTimeout
   , getTimeout
   , now
+  , toUs
   ) where
 
 import Data.Time.Clock
