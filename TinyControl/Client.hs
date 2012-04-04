@@ -7,6 +7,7 @@ import TinyControl.Common (Handle(..), Data(..), Friend, makeTimeDiff)
 import qualified TinyControl.Common as C
 import qualified TinyControl.Packet as P
 import TinyControl.Packet (DataPacket)
+import TinyControl.Time (diffTimeToUs)
 
 import Control.Monad.Trans.Class (lift)
 import Control.Monad.Trans.RWS.Lazy hiding (state)
@@ -27,11 +28,15 @@ import Network.Socket (
   , recvFrom)
 import Network.BSD (HostName, defaultProtocol)
 import System.Timeout(timeout)
-import Data.Time (UTCTime, getCurrentTime)
+import Data.Time (UTCTime(..), getCurrentTime, diffUTCTime)
 import Data.Set (Set)
 import qualified Data.Set as Set
 
-data ClientState = ClientState { a :: ()
+data ClientState = ClientState { lastDataPacket :: P.DataPacket
+                               , lastDataPacketTime :: UTCTime
+                               , nextTimeout :: Maybe UTCTime
+                               , p :: Float
+                               , x_recv :: Int
                                }
                                deriving (Show, Read)
 
@@ -53,15 +58,22 @@ firstPacket sock = do
        then return $ P.payload packet
        else do
          -- initialize state from pack
-         let ss = initialState 
+         let ss = initialState packet t_delay_start
          -- send Feedback Packet
+         makeAndSendFeedbackPacket sock friend ss
          -- determine timeout interval
          -- begin running through states
          (_, _, w) <- runRWST (m1 (timeout (getTimeout ss) (recv sock))) (sock, friend) ss
          return $ (P.payload packet) `append` w
 
-initialState :: ClientState
-initialState = ClientState { a = () }
+initialState :: P.DataPacket -> UTCTime -> ClientState
+initialState dp t_delay_start = ClientState { 
+     lastDataPacket = dp
+   , lastDataPacketTime = t_delay_start
+   , nextTimeout = Nothing
+   , p = 0
+   , x_recv = 0
+   }
 
 m1 :: IO (Maybe (Friend, String)) -> ClientStateMonad (Socket, Friend) ()
 m1 result = do
@@ -89,7 +101,7 @@ m2 result = do
              m2 (timeout (getTimeout ss) (recv sock))
          Nothing -> do
              expireFeedbackTimer
-             sendFeedbackPacket
+             lift $ makeAndSendFeedbackPacket sock f ss
              m3 (timeout (getTimeout ss) (recv sock))
 
 m3 :: IO (Maybe (Friend, String)) -> ClientStateMonad (Socket, Friend) ()
@@ -101,6 +113,7 @@ m3 result = do
          Just (_, d) -> do
              let p = read d
              gotDataPacket p
+             lift $ makeAndSendFeedbackPacket sock f ss
              m1 (timeout (getTimeout ss) (recv sock))
          Nothing -> do
              expireFeedbackTimer
@@ -109,20 +122,33 @@ m3 result = do
 getTimeout :: ClientState -> Int
 getTimeout = error "getTimeout not implemented"
 
-makeDataPacket :: String -> DataPacket
-makeDataPacket d = error "makeFeedbackPacket not implemented"
+makeAndSendFeedbackPacket :: Socket -> Friend -> ClientState -> IO ()
+makeAndSendFeedbackPacket sock friend ss = do
+    feedbackPacket <- makeFeedbackPacket ss
+    sendFeedbackPacket sock friend feedbackPacket
+
+makeFeedbackPacket :: ClientState -> IO P.FeedbackPacket
+makeFeedbackPacket s = do
+    now <- getCurrentTime
+    return P.FeedbackPacket {
+        P.t_recvdata = (P.timeStamp (lastDataPacket s))
+      , P.t_delay = diffTimeToUs $ now `diffUTCTime` (lastDataPacketTime s)
+      , P.x_recv = x_recv s
+      , P.p = p s }
+
+sendFeedbackPacket :: Socket -> Friend -> P.FeedbackPacket -> IO ()
+sendFeedbackPacket sock friend packet = do
+    -- TODO cut out middle man, this should always be exactly 16 bytes once
+    --  we are sending correctly
+    send sock friend (show packet)
 
 gotDataPacket :: DataPacket -> ClientStateMonad (Socket, Friend) ()
 gotDataPacket p = do
     tell (P.payload p)
-    error "gotDataPacket not implemented"
+    return ()
 
 expireFeedbackTimer :: ClientStateMonad (Socket, Friend) ()
-expireFeedbackTimer = error "expireFeedbackTimer not implemented"
-
-sendFeedbackPacket :: ClientStateMonad (Socket, Friend) ()
-sendFeedbackPacket = error "sendFeedbackPacket not implemented"
-
+expireFeedbackTimer = do return ()
 
 open :: String -> String -> IO (Socket, Friend)
 open hostname port =
