@@ -2,7 +2,8 @@ module TinyControl.Packet
     (
           DataPacket(..)
         , FeedbackPacket(..)
-        , s)
+        , s
+        , dataPacketSize)
     where
 
 import System.Time (ClockTime, TimeDiff, CalendarTime)
@@ -22,3 +23,6 @@ data FeedbackPacket = FeedbackPacket { t_recvdata :: CalendarTime
 
 s::Int
 s = 1000
+
+dataPacketSize :: Int
+dataPacketSize = 1012
