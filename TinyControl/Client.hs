@@ -7,7 +7,7 @@ import TinyControl.Common (Handle(..), Data(..), Friend, makeTimeDiff)
 import qualified TinyControl.Common as C
 import qualified TinyControl.Packet as P
 import TinyControl.Packet (DataPacket)
-import TinyControl.Time (diffTimeToUs)
+import TinyControl.Time (diffTimeToUs, getTimeout, nextTimeout, toUs)
 
 import Control.Monad.Trans.Class (lift)
 import Control.Monad.Trans.RWS.Lazy hiding (state)
@@ -34,7 +34,7 @@ import qualified Data.Set as Set
 
 data ClientState = ClientState { lastDataPacket :: P.DataPacket
                                , lastDataPacketTime :: UTCTime
-                               , nextTimeout :: Maybe UTCTime
+                               , nextTimeoutTime :: UTCTime
                                , p :: Float
                                , x_recv :: Int
                                }
@@ -62,65 +62,76 @@ firstPacket sock = do
          -- send Feedback Packet
          makeAndSendFeedbackPacket sock friend ss
          -- determine timeout interval
+         futureTimeout <- nextTimeout $ toUs (P.rtt packet)
+         let ss' = ss {nextTimeoutTime = futureTimeout}
          -- begin running through states
-         (_, _, w) <- runRWST (m1 (timeout (getTimeout ss) (recv sock))) (sock, friend) ss
+         let nextPacket = receiveNextPacket sock ss'
+         (_, _, w) <- runRWST (m1 nextPacket) (sock, friend) ss'
          return $ (P.payload packet) `append` w
 
 initialState :: P.DataPacket -> UTCTime -> ClientState
 initialState dp t_delay_start = ClientState { 
      lastDataPacket = dp
    , lastDataPacketTime = t_delay_start
-   , nextTimeout = Nothing
+   , nextTimeoutTime = read "0000-00-00 00:00:00"
    , p = 0
    , x_recv = 0
    }
 
-m1 :: IO (Maybe (Friend, String)) -> ClientStateMonad (Socket, Friend) ()
+receiveNextPacket :: Socket -> ClientState -> IO (Maybe (String, Int, SockAddr))
+receiveNextPacket sock ss = do
+    timeoutInterval <- getTimeout (nextTimeoutTime ss)
+    timeout timeoutInterval (recvFrom sock P.dataPacketSize)
+
+m1 :: IO (Maybe (String, Int, SockAddr)) -> ClientStateMonad (Socket, Friend) ()
 m1 result = do
     (sock, f) <- ask
     ss <- get
     maybeD <- lift result
     case (maybeD) of
-         Just (_, d) -> do
+         Just (d, _, _) -> do
              let p = read d
              gotDataPacket p
-             m2 (timeout (getTimeout ss) (recv sock))
+             let nextPacket = receiveNextPacket sock ss
+             m2 nextPacket
          Nothing -> do
              expireFeedbackTimer
-             m3 (timeout (getTimeout ss) (recv sock))
+             let nextPacket = receiveNextPacket sock ss
+             m3 nextPacket
     
-m2 :: IO (Maybe (Friend, String)) -> ClientStateMonad (Socket, Friend) ()
+m2 :: IO (Maybe (String, Int, SockAddr)) -> ClientStateMonad (Socket, Friend) ()
 m2 result = do
     (sock, f) <- ask
     ss <- get
     maybeD <- lift result
     case (maybeD) of
-         Just (_, d) -> do
+         Just (d, _, _) -> do
              let p = read d
              gotDataPacket p
-             m2 (timeout (getTimeout ss) (recv sock))
+             let nextPacket = receiveNextPacket sock ss
+             m2 nextPacket
          Nothing -> do
              expireFeedbackTimer
              lift $ makeAndSendFeedbackPacket sock f ss
-             m3 (timeout (getTimeout ss) (recv sock))
+             let nextPacket = receiveNextPacket sock ss
+             m3 nextPacket
 
-m3 :: IO (Maybe (Friend, String)) -> ClientStateMonad (Socket, Friend) ()
+m3 :: IO (Maybe (String, Int, SockAddr)) -> ClientStateMonad (Socket, Friend) ()
 m3 result = do
     (sock, f) <- ask
     ss <- get
     maybeD <- lift result
     case (maybeD) of
-         Just (_, d) -> do
+         Just (d, _, _) -> do
              let p = read d
              gotDataPacket p
              lift $ makeAndSendFeedbackPacket sock f ss
-             m1 (timeout (getTimeout ss) (recv sock))
+             let nextPacket = receiveNextPacket sock ss
+             m1 nextPacket
          Nothing -> do
              expireFeedbackTimer
-             m3 (timeout (getTimeout ss) (recv sock))
-
-getTimeout :: ClientState -> Int
-getTimeout = error "getTimeout not implemented"
+             let nextPacket = receiveNextPacket sock ss
+             m3 nextPacket
 
 makeAndSendFeedbackPacket :: Socket -> Friend -> ClientState -> IO ()
 makeAndSendFeedbackPacket sock friend ss = do
@@ -165,10 +176,10 @@ open hostname port =
        -- Send back the handle
        return (theSock, addrAddress serveraddr)
 
-recv :: Socket -> IO (Friend, String)
-recv sock = do
-    (msg, _, addr) <- recvFrom sock 1024
-    return (addr, msg)
+-- recv :: Socket -> IO (Friend, String)
+-- recv sock = do
+--     (msg, _, addr) <- recvFrom sock 1024
+--     return (addr, msg)
 
 send :: Socket -> Friend -> String -> IO ()
 send sock friend msg = C.sendstr sock friend msg
