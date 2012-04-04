@@ -20,6 +20,7 @@ import System.Timeout(timeout)
 import Control.Concurrent(myThreadId, forkIO)
 
 import Data.ByteString (ByteString)
+import qualified Data.ByteString as ByteString
 import Data.ByteString.Char8 (pack, unpack)
 import Network.Socket (
   Socket
@@ -68,9 +69,10 @@ serveData port f = do
     serverThread handle friend msg = do
       resp <- f msg
       serverThreadHelper handle friend resp
-    serverThreadHelper _ _ [] = return ()
+    serverThreadHelper :: ServerHandle -> Friend -> Data -> IO ()
+    serverThreadHelper _ _ m | m == ByteString.empty = return ()
     serverThreadHelper handle friend msg = do
-      let (mmsg, rest) = splitAt 100 msg
+      let (mmsg, rest) = ByteString.splitAt 1000 msg
       now <- T.now
       let rmsg = P.DataPacket {
           P.seqNum = 0,
@@ -80,7 +82,7 @@ serveData port f = do
           }
       handle <- send handle friend (show rmsg)
       close handle
-      serverThreadHelper rest
+      (serverThreadHelper handle friend rest)
 
 
 open :: String -> IO (ServerHandle)
