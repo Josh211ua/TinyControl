@@ -1,5 +1,6 @@
 module TinyControl.Time
-  ( toUs
+  ( diffTimeToUs
+  , usToDiffTime
   , nextTimeout
   , getTimeout
   ) where
@@ -9,6 +10,14 @@ import Data.Time.Clock
 -- Converts seconds into microseconds
 toUs :: Int -> Integer
 toUs s = 1000 * 1000 * (fromIntegral s)
+
+diffTimeToUs :: NominalDiffTime -> Int
+diffTimeToUs diff = do
+    floor $ (toRational diff) * 1000 * 1000
+
+usToDiffTime :: Int -> NominalDiffTime
+usToDiffTime us = do
+    realToFrac $ picosecondsToDiffTime ((fromIntegral us) * 1000 * 1000)
 
 -- Returns a time us microseconds after now
 nextTimeout :: Integer -> IO UTCTime

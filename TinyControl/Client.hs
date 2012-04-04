@@ -26,34 +26,29 @@ import Network.Socket (
   , defaultHints
   , recvFrom)
 import Network.BSD (HostName, defaultProtocol)
-import System.Time (TimeDiff(..), CalendarTime, getClockTime, toCalendarTime)
 import System.Timeout(timeout)
 import Data.Set (Set)
 import qualified Data.Set as Set
 
-data ClientState = ClientState { rto :: TimeDiff
-                               , tld :: CalendarTime
-                               , r :: Maybe TimeDiff
-                               , x_recvset :: Set (CalendarTime, Int)
-                               , x :: Int
+data ClientState = ClientState { a :: ()
                                }
                                deriving (Show, Read)
-
-type ClientHandle = Handle ClientState
 
 type ClientStateMonad r = RWST r ByteString ClientState IO
 
 wantData :: String -> String -> Data -> IO Data
 wantData host port msg = do
-    x <- open host port
-    let (h@(Handle{sock = s, state = ss}), friend) = x
-    send s friend (unpack msg)
-    recvAll ( h ) friend
+    (sock, friend) <- open host port
+    send sock friend (unpack msg)
+    recvAll sock friend
 
-recvAll :: ClientHandle -> Friend -> IO Data
-recvAll (Handle {sock = s, state = ss}) friend = do
+recvAll :: Socket -> Friend -> IO Data
+recvAll s friend = do
+    let ss = initialState
     (_, _, w) <- runRWST (m1 (timeout (getTimeout ss) (recv s))) (s, friend) ss
     return w
+
+initialState = ClientState { a = () }
 
 m1 :: IO (Maybe (Friend, String)) -> ClientStateMonad (Socket, Friend) ()
 m1 result = do
@@ -116,7 +111,7 @@ sendFeedbackPacket :: ClientStateMonad (Socket, Friend) ()
 sendFeedbackPacket = error "sendFeedbackPacket not implemented"
 
 
-open :: String -> String -> IO (Handle ClientState, Friend)
+open :: String -> String -> IO (Socket, Friend)
 open hostname port =
     do -- Look up the hostname and port.  Either raises an exception
        -- or returns a nonempty list.  First element in that list
@@ -128,48 +123,16 @@ open hostname port =
        theSock <- socket (addrFamily serveraddr) Datagram defaultProtocol
        --let friend = serveraddr
 
-       -- Initailize State
-       now <- getClockTime
-       calNow <- toCalendarTime now
-       let theState = ClientState {
-            rto = makeTimeDiff 2,
-            tld = calNow,
-            r = Nothing,
-            x_recvset = Set.empty,
-            x = Packet.s
-            }
-
        -- Send back the handle
-       return $ (Handle { sock=theSock, state=theState }, addrAddress serveraddr)
+       return (theSock, addrAddress serveraddr)
 
 recv :: Socket -> IO (Friend, String)
 recv sock = do
     (msg, _, addr) <- recvFrom sock 1024
     return (addr, msg)
 
--- recieveHelper :: ClientStateMonad (Socket) (Friend, Data) -- t m a
--- recieveHelper = do
---   sock <- ask
---   -- Receive one UDP packet, maximum length 1024 bytes,
---   -- and save its content into msg and its source
---   -- IP and port into addr
---   (msg, _, addr) <- lift (recvFrom sock 1024)
---   let d = (pack msg)
---   return (addr, d)
--- 
--- recv :: Handle ClientState -> IO (Handle ClientState, Friend, Data)
--- recv h = C.recv h recieveHelper
-
 send :: Socket -> Friend -> String -> IO ()
 send sock friend msg = C.sendstr sock friend msg
 
--- sendHelper :: ClientStateMonad (Socket,Friend,Data) ()
--- sendHelper = do
---     (sock, friend, msg) <- ask
---     lift $ C.sendstr sock friend (unpack msg)
--- 
--- send :: Handle ClientState -> Friend -> Data -> IO (Handle ClientState)
--- send h friend msg = C.send h friend msg sendHelper
-
-close :: Handle ClientState -> IO ()
-close = C.close
+close :: Socket -> IO ()
+close s = sClose s

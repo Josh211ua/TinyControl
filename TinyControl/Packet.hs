@@ -6,17 +6,17 @@ module TinyControl.Packet
         , dataPacketSize)
     where
 
-import System.Time (ClockTime, TimeDiff, CalendarTime)
 import Data.ByteString (ByteString)
+import Data.Time (UTCTime)
 
 data DataPacket = DataPacket { seqNum :: Int
-                             , timeStamp :: CalendarTime
-                             , rtt :: TimeDiff
+                             , timeStamp :: UTCTime
+                             , rtt :: Int
                              , payload :: ByteString
                              } deriving (Show, Read)
 
-data FeedbackPacket = FeedbackPacket { t_recvdata :: CalendarTime
-                                     , t_delay :: TimeDiff
+data FeedbackPacket = FeedbackPacket { t_recvdata :: UTCTime
+                                     , t_delay :: Int
                                      , x_recv :: Int
                                      , p :: Float
                                      } deriving (Show, Read)
