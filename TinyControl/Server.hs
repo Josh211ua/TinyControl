@@ -66,17 +66,21 @@ serveData port f = do
       serve h
     serverThread :: ServerHandle -> Friend -> Data -> IO ()
     serverThread handle friend msg = do
-      myId <- myThreadId
       resp <- f msg
+      serverThreadHelper handle friend resp
+    serverThreadHelper _ _ [] = return ()
+    serverThreadHelper handle friend msg = do
+      let (mmsg, rest) = splitAt 100 msg
       now <- T.now
       let rmsg = P.DataPacket {
           P.seqNum = 0,
           P.timeStamp = now,
           P.rtt = 0,
-          P.payload = resp
+          P.payload = mmsg
           }
       handle <- send handle friend (show rmsg)
       close handle
+      serverThreadHelper rest
 
 
 open :: String -> IO (ServerHandle)
