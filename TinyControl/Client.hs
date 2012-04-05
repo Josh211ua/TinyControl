@@ -285,7 +285,17 @@ dealWithLossEvents lossEvents = do
 
 tLoss :: PacketStamp -> PacketStamp -> SeqNum -> TimeStamp
 -- Going to assume sLoss is one after sBegin
-tLoss = undefined
+tLoss (s_before, t_before) (s_after, t_after) s_loss = 
+    let diffSeconds = diffTimeToS (t_after `diffUTCTime` t_before) in
+    let diffDist = floor $ (dist s_loss s_before) / (dist s_after s_before) in
+    (sToDiffTime (diffSeconds * diffDist)) `addUTCTime` t_before
+
+s_max :: Integer
+s_max = 2^32
+
+dist :: SeqNum -> SeqNum -> Float
+dist a b = let s_a = toInteger a in let s_b = toInteger b in
+                     fromInteger $ (s_a + s_max - s_b) `mod` s_max
 
 newLossInterval = undefined
 
