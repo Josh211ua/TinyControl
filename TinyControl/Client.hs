@@ -122,7 +122,7 @@ m2 result = do
              expireFeedbackTimer
              lift $ makeAndSendFeedbackPacket sock f ss
              let nextPacket = receiveNextPacket sock ss
-             m3 nextPacket
+             m1 nextPacket
 
 m3 :: IO (Maybe (String, Int, SockAddr)) -> ClientStateMonad (Socket, Friend) ()
 m3 result = do
