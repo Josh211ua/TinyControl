@@ -7,7 +7,7 @@ import TinyControl.Common (Handle(..), Data(..), Friend, makeTimeDiff)
 import qualified TinyControl.Common as C
 import qualified TinyControl.Packet as P
 import TinyControl.Packet (DataPacket)
-import TinyControl.Time (diffTimeToS, getTimeout, nextTimeout, toUs)
+import TinyControl.Time (diffTimeToS, sToDiffTime, getTimeout, nextTimeout, toUs)
 
 import Control.Monad.Trans.Class (lift)
 import Control.Monad.Trans.RWS.Lazy hiding (state)
@@ -29,7 +29,7 @@ import Network.Socket (
   , recvFrom)
 import Network.BSD (HostName, defaultProtocol)
 import System.Timeout(timeout)
-import Data.Time (UTCTime(..), getCurrentTime, diffUTCTime)
+import Data.Time (UTCTime(..), getCurrentTime, diffUTCTime, addUTCTime)
 import Data.Set (Set)
 import qualified Data.Set as Set
 
@@ -276,7 +276,7 @@ dealWithLossEvents lossEvents = do
           let tLoss' = tLoss b a sLoss
           let lastPacket' = lastPacket ss
           case lastLossEvent ss of
-            Just (_, tOld) -> if (tOld + (P.rtt lastPacket')) >= tLoss'
+            Just (_, tOld) -> if (sToDiffTime (P.rtt lastPacket') `addUTCTime` tOld) >= tLoss'
                                  then do
                                     newLossInterval b a
                                     dealWithRest xs
