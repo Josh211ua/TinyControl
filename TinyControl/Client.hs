@@ -185,8 +185,9 @@ sendFeedbackPacket sock friend packet = do
 gotDataPacket :: DataPacket -> Bool -> ClientStateMonad ()
 gotDataPacket pack inM3 = do
     ss <- get
+    timeStamp <- lift $ currentTime
     tell (P.payload pack)
-    addToPacketHistory pack
+    addToPacketHistory pack timeStamp
     loss <- checkForLoss
     if loss || inM3
        then do
@@ -198,8 +199,11 @@ gotDataPacket pack inM3 = do
               else return ()
        else return ()
 
-addToPacketHistory :: DataPacket -> ClientStateMonad ()
-addToPacketHistory = undefined
+addToPacketHistory :: DataPacket -> TimeStamp -> ClientStateMonad ()
+addToPacketHistory dp newT = do
+    ss <- get
+    let (oldSeq, oldT) = lastPacket ss
+    let new
 
 checkForLoss :: ClientStateMonad (Bool)
 checkForLoss = undefined
