@@ -156,7 +156,10 @@ sendFeedbackPacket sock friend packet = do
 gotDataPacket :: DataPacket -> ClientStateMonad (Socket, Friend) ()
 gotDataPacket p = do
     tell (P.payload p)
+    --addToPacketHistory
+    --if done
     return ()
+    --else
 
 expireFeedbackTimer :: ClientStateMonad (Socket, Friend) ()
 expireFeedbackTimer = do return ()
@@ -175,11 +178,6 @@ open hostname port =
 
        -- Send back the handle
        return (theSock, addrAddress serveraddr)
-
--- recv :: Socket -> IO (Friend, String)
--- recv sock = do
---     (msg, _, addr) <- recvFrom sock 1024
---     return (addr, msg)
 
 send :: Socket -> Friend -> String -> IO ()
 send sock friend msg = C.sendstr sock friend msg
