@@ -220,6 +220,9 @@ addToPacketHistory dp newT = do
          LT -> error "Need to find gap to fill"
     return ()
 
+mduC :: Int
+mduC = 3
+
 incrementMDUs :: SeqNum -> [PreLossEvent] -> [PreLossEvent]
 incrementMDUs s oldPacketHistory = do 
     ple <- oldPacketHistory
@@ -233,9 +236,17 @@ checkForLoss :: ClientStateMonad (Bool)
 checkForLoss = do
     ss <- get
     let Just(lastPacketSeq, _) = lastPacket ss
-    let newHistory = incrementMDUs (lastPacketSeq) (packetHistory ss)
+    let incrementHistory = incrementMDUs (lastPacketSeq) (packetHistory ss)
+    let (newHistory, lossEvent) = span (\x -> mdu x <= mduC) incrementHistory
     put $ ss {packetHistory = newHistory}
-    return True
+    if null lossEvent
+       then return False
+       else do
+           dealWithLossEvents lossEvent
+           return True
+
+dealWithLossEvents :: [PreLossEvent] -> ClientStateMonad ()
+dealWithLossEvents lossEvents = undefined
 
 expireFeedbackTimer :: ClientStateMonad ()
 expireFeedbackTimer = do
