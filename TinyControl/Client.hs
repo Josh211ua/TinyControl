@@ -204,6 +204,7 @@ resetFeedbackTimer = do
   futureTimeout <- lift $ nextTimeout $ P.rtt lastPack
   put $ ss { nextTimeoutTime = futureTimeout }
 
+-- UDP Operations
 open :: String -> String -> IO (Socket, Friend)
 open hostname port =
     do -- Look up the hostname and port.  Either raises an exception
