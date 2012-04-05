@@ -44,16 +44,14 @@ data PreLossEvent = PreLossEvent { before :: PacketStamp
 data ClientState = ClientState { intervals :: [Interval]
                                , packetHistory :: [ PreLossEvent ]
                                , lastLossEvent :: Maybe PacketStamp
-                               , lastPacket :: Maybe PacketStamp
-                               , lastDataPacket :: P.DataPacket
-                               , lastDataPacketTime :: UTCTime
+                               , lastPacket :: PacketStamp
                                , nextTimeoutTime :: UTCTime
                                , p :: Float
                                , x_recv :: Int
                                }
                                deriving (Show, Read)
 
-type ClientStateMonad = RWST (Socket, Friend) ByteString ClientState IO
+type ClientStateMonad = RWST (Socket, Friend) [(SeqNum,ByteString)] ClientState IO
 
 wantData :: String -> String -> Data -> IO Data
 wantData host port msg = do
@@ -87,9 +85,7 @@ initialState dp t_delay_start = ClientState {
      intervals = []
    , packetHistory = []
    , lastLossEvent = Nothing
-   , lastPacket = Nothing
-   , lastDataPacket = dp
-   , lastDataPacketTime = t_delay_start
+   , lastPacket = (dp, t_delay_start)
    , nextTimeoutTime = read "0000-00-00 00:00:00"
    , p = 0
    , x_recv = 0
@@ -171,8 +167,8 @@ makeFeedbackPacket :: ClientState -> IO P.FeedbackPacket
 makeFeedbackPacket s = do
     now <- getCurrentTime
     return P.FeedbackPacket {
-        P.t_recvdata = (P.timeStamp (lastDataPacket s))
-      , P.t_delay = diffTimeToS $ now `diffUTCTime` (lastDataPacketTime s)
+        P.t_recvdata = (P.timeStamp (lastPacket s))
+      , P.t_delay = diffTimeToS $ now `diffUTCTime` (lastPacket s)
       , P.x_recv = x_recv s
       , P.p = p s }
 
@@ -186,7 +182,7 @@ gotDataPacket :: DataPacket -> Bool -> ClientStateMonad ()
 gotDataPacket pack inM3 = do
     ss <- get
     timeStamp <- lift $ getCurrentTime
-    tell (P.payload pack)
+    tell ((P.seqNum pack),(P.payload pack))
     addToPacketHistory pack timeStamp
     loss <- checkForLoss
     if loss || inM3
@@ -202,8 +198,8 @@ gotDataPacket pack inM3 = do
 addToPacketHistory :: DataPacket -> TimeStamp -> ClientStateMonad ()
 addToPacketHistory dp newT = do
     ss <- get
-    let Just (oldSeq, oldT) = lastPacket ss
     let newSeq = P.seqNum dp
+    let (oldSeq, oldT) = lastPacket ss
     let oldPacketHistory = packetHistory ss
     case (compare newSeq (oldSeq + 1)) of
          EQ -> put ss { lastPacket = Just (newSeq, newT) }
@@ -272,13 +268,13 @@ dealWithLossEvents lossEvents = do
                                   , after = a
                                   ,  mdu = m}:xs) = do
           ss <- get
-          let sLoss = (seqNum before) + 1
+          let sLoss = (P.seqNum before) + 1
           let tLoss' = tLoss before after sLoss
           case lastPacket ss of
              Nothing -> error "No idea what goes here either"
              Just lastPacket' ->
               case lastLossEvent ss of
-                Just (_, tOld) -> if (tOld + (rtt lastPacket')) >= tLoss'
+                Just (_, tOld) -> if (tOld + (P.rtt lastPacket')) >= tLoss'
                                      then do 
                                         newLossInterval before after
                                         dealWithRest xs
@@ -288,6 +284,8 @@ dealWithLossEvents lossEvents = do
 tLoss :: PacketStamp -> PacketStamp -> SeqNum -> TimeStamp
 -- Going to assume sLoss is one after sBegin
 tLoss = undefined
+
+newLossInterval = undefined
 
 expireFeedbackTimer :: ClientStateMonad ()
 expireFeedbackTimer = do
@@ -302,7 +300,7 @@ expireFeedbackTimer = do
 resetFeedbackTimer :: ClientStateMonad  ()
 resetFeedbackTimer = do
   ss <- get
-  let lastPack = lastDataPacket ss
+  let lastPack = lastPacket ss
   futureTimeout <- lift $ nextTimeout $ P.rtt lastPack
   put $ ss { nextTimeoutTime = futureTimeout }
 
