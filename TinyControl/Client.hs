@@ -32,7 +32,20 @@ import Data.Time (UTCTime(..), getCurrentTime, diffUTCTime)
 import Data.Set (Set)
 import qualified Data.Set as Set
 
-data ClientState = ClientState { lastDataPacket :: P.DataPacket
+type SeqNum = Int
+type Interval = Int
+type TimeStamp = UTCTime
+type PacketStamp = (SeqNum, TimeStamp)
+data PreLossEvent = PreLossEvent { before :: PacketStamp
+                                 , after :: PacketStamp
+                                 , mdu :: Int
+                                 } deriving (Show, Read)
+
+data ClientState = ClientState { intervals :: [Interval]
+                               , packetHistory :: [ PreLossEvent ]
+                               , lastLossEvent :: Maybe PacketStamp
+                               , lastPacket :: Maybe PacketStamp
+                               , lastDataPacket :: P.DataPacket
                                , lastDataPacketTime :: UTCTime
                                , nextTimeoutTime :: UTCTime
                                , p :: Float
@@ -71,7 +84,11 @@ firstPacket sock = do
 
 initialState :: P.DataPacket -> UTCTime -> ClientState
 initialState dp t_delay_start = ClientState {
-     lastDataPacket = dp
+     intervals = []
+   , packetHistory = []
+   , lastLossEvent = Nothing
+   , lastPacket = Nothing
+   , lastDataPacket = dp
    , lastDataPacketTime = t_delay_start
    , nextTimeoutTime = read "0000-00-00 00:00:00"
    , p = 0
