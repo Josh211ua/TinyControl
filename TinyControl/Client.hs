@@ -53,7 +53,7 @@ data ClientState = ClientState { intervals :: [Interval]
                                }
                                deriving (Show, Read)
 
-type ClientStateMonad r = RWST r ByteString ClientState IO
+type ClientStateMonad = RWST (Socket, Friend) ByteString ClientState IO
 
 wantData :: String -> String -> Data -> IO Data
 wantData host port msg = do
@@ -100,7 +100,7 @@ receiveNextPacket sock ss = do
     timeoutInterval <- getTimeout (nextTimeoutTime ss)
     timeout (toUs timeoutInterval) (recvFrom sock P.dataPacketSize)
 
-m1 :: IO (Maybe (String, Int, SockAddr)) -> ClientStateMonad (Socket, Friend) ()
+m1 :: IO (Maybe (String, Int, SockAddr)) -> ClientStateMonad ()
 m1 result = do
     lift $ print "entering m1"
     (sock, f) <- ask
@@ -120,7 +120,7 @@ m1 result = do
              let nextPacket = receiveNextPacket sock ss
              m3 nextPacket
 
-m2 :: IO (Maybe (String, Int, SockAddr)) -> ClientStateMonad (Socket, Friend) ()
+m2 :: IO (Maybe (String, Int, SockAddr)) -> ClientStateMonad ()
 m2 result = do
     lift $ print "entering m2"
     (sock, f) <- ask
@@ -141,7 +141,7 @@ m2 result = do
              let nextPacket = receiveNextPacket sock ss
              m1 nextPacket
 
-m3 :: IO (Maybe (String, Int, SockAddr)) -> ClientStateMonad (Socket, Friend) ()
+m3 :: IO (Maybe (String, Int, SockAddr)) -> ClientStateMonad ()
 m3 result = do
     lift $ print "entering m3"
     (sock, f) <- ask
@@ -154,11 +154,11 @@ m3 result = do
                 then return ()
                 else do
                     gotDataPacket p
-                    lift $ makeAndSendFeedbackPacket sock f ss
+                    expireFeedbackTimer
                     let nextPacket = receiveNextPacket sock ss
                     m1 nextPacket
          Nothing -> do
-             expireFeedbackTimer
+             resetFeedbackTimer
              let nextPacket = receiveNextPacket sock ss
              m3 nextPacket
 
@@ -182,7 +182,7 @@ sendFeedbackPacket sock friend packet = do
     --  we are sending correctly
     send sock friend (show packet)
 
-gotDataPacket :: DataPacket -> ClientStateMonad (Socket, Friend) ()
+gotDataPacket :: DataPacket -> ClientStateMonad ()
 gotDataPacket p = do
     tell (P.payload p)
     --addToPacketHistory
@@ -190,12 +190,19 @@ gotDataPacket p = do
     return ()
     --else
 
-expireFeedbackTimer :: ClientStateMonad (Socket, Friend) ()
+expireFeedbackTimer :: ClientStateMonad ()
 expireFeedbackTimer = do
+    (sock,f) <- ask
     ss <- get
-    let lastPack = lastDataPacket ss
-    futureTimeout <- lift $ nextTimeout $ P.rtt lastPack
-    put $ ss { nextTimeoutTime = futureTimeout }
+    lift $ makeAndSendFeedbackPacket sock f ss
+    resetFeedbackTimer
+
+resetFeedbackTimer :: ClientStateMonad  ()
+resetFeedbackTimer = do
+  ss <- get
+  let lastPack = lastDataPacket ss
+  futureTimeout <- lift $ nextTimeout $ P.rtt lastPack
+  put $ ss { nextTimeoutTime = futureTimeout }
 
 open :: String -> String -> IO (Socket, Friend)
 open hostname port =
