@@ -28,16 +28,19 @@ defaultPacket = DataPacket { seqNum = 0
                             , payload = BC.pack (replicate 1000 'm')
                             }
 
+--(\x -> trace (show (length x)) x) $
 instance Show DataPacket where
     show DataPacket { seqNum = s
                     , timeStamp = t
                     , rtt = r
                     , payload = p } =
-       (\x -> trace (show (length x)) x) $ BLC.unpack ( encode (s, r, p) )
+        BLC.unpack ( encode (s, r, p) )
 
 instance Read DataPacket where
     readsPrec _ b =
-        let (s, r, p) = decode $ BLC.pack $ b in
+        let (s, r, p) = decode $ (\x -> case (BLC.length x) of
+                                            1024 -> x
+                                            y -> (trace (show y)) x) $ BLC.pack $ b in
         [(DataPacket { seqNum = s
                    , timeStamp = read "0000-00-00 00:00:00"
                    , rtt = r
@@ -56,9 +59,10 @@ instance Show FeedbackPacket where
                         , p = l} =
        (\x -> (trace (show (length x))) x) $ BLC.unpack ( encode (d, x, l) )
 
+-- (\x -> (trace (show (BLC.length x))) x) $
 instance Read FeedbackPacket where
     readsPrec _ b =
-        let (d, x, l) = decode $ BLC.pack $ b in
+        let (d, x, l) = decode $  BLC.pack $ b in
         [(FeedbackPacket { t_recvdata = read "0000-00-00 00:00:00"
                          , t_delay = d
                          , x_recv = x

@@ -85,6 +85,7 @@ receiveNextPacket sock ss = do
 
 m1 :: IO (Maybe (String, Int, SockAddr)) -> ClientStateMonad (Socket, Friend) ()
 m1 result = do
+    lift $ print "entering m1"
     (sock, f) <- ask
     ss <- get
     maybeD <- lift result
@@ -104,6 +105,7 @@ m1 result = do
 
 m2 :: IO (Maybe (String, Int, SockAddr)) -> ClientStateMonad (Socket, Friend) ()
 m2 result = do
+    lift $ print "entering m2"
     (sock, f) <- ask
     ss <- get
     maybeD <- lift result
@@ -124,6 +126,7 @@ m2 result = do
 
 m3 :: IO (Maybe (String, Int, SockAddr)) -> ClientStateMonad (Socket, Friend) ()
 m3 result = do
+    lift $ print "entering m3"
     (sock, f) <- ask
     ss <- get
     maybeD <- lift result
