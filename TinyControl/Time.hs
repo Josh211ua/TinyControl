@@ -33,7 +33,7 @@ nextTimeout s = do
 getTimeout :: UTCTime -> IO Int
 getTimeout t = do
     now <- getCurrentTime
-    let diff = now `diffUTCTime` t
+    let diff = t `diffUTCTime` now
     let realDiff = floor $ (toRational diff)
     if realDiff < 0
        then return 0
