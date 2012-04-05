@@ -42,7 +42,8 @@ data PreLossEvent = PreLossEvent { before :: PacketStamp
                                  , mdu :: Int
                                  } deriving (Show, Read)
 
-data ClientState = ClientState { intervals :: [Interval]
+data ClientState = ClientState { packetCount :: Int
+                               , intervals :: [Interval]
                                , packetHistory :: [ PreLossEvent ]
                                , lastLossEvent :: Maybe PacketStamp
                                , lastPacketStamp :: PacketStamp
@@ -85,6 +86,7 @@ firstPacket sock = do
 initialState :: P.DataPacket -> UTCTime -> ClientState
 initialState dp t_delay_start = ClientState {
      intervals = []
+   , packetCount = 0
    , packetHistory = []
    , lastLossEvent = Nothing
    , lastPacket = dp
@@ -184,6 +186,8 @@ sendFeedbackPacket sock friend packet = do
 gotDataPacket :: DataPacket -> Bool -> ClientStateMonad ()
 gotDataPacket pack inM3 = do
     ss <- get
+    put ss { packetCount = (packetCount ss) + 1 }
+    ss' <- get
     timeStamp <- lift $ getCurrentTime
     tell [((P.seqNum pack),(P.payload pack))]
     addToPacketHistory pack timeStamp
@@ -191,7 +195,7 @@ gotDataPacket pack inM3 = do
     if loss || inM3
        then do
            let p' = calculateP $ intervals ss
-           let p_prev = p ss
+           let p_prev = p ss'
            put $ ss { p = p' }
            if (p' > p_prev)
               then expireFeedbackTimer
@@ -311,7 +315,7 @@ expireFeedbackTimer = do
     (sock,f) <- ask
     ss <- get
     let p' = calculateP (intervals ss)
-    let x_recv' = calculateMeasuredReceiveRate
+    x_recv' <- calculateMeasuredReceiveRate
     put $ ss {p = p', x_recv = x_recv'}
     lift $ makeAndSendFeedbackPacket sock f ss
     resetFeedbackTimer
@@ -350,7 +354,11 @@ wTot :: Float
 wTot = sum wS
 
 -- Calculate x_recv:
-calculateMeasuredReceiveRate = undefined
+calculateMeasuredReceiveRate :: ClientStateMonad (Int)
+calculateMeasuredReceiveRate = do
+    ss <- get
+    return $ floor $ (toRational $ (packetCount ss) * P.s) / 
+        (toRational $ P.rtt $ lastPacket ss)
 
 -- UDP Operations
 open :: String -> String -> IO (Socket, Friend)
