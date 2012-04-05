@@ -69,6 +69,7 @@ serveData port f = do
     serverThread handle friend msg = do
       resp <- f msg
       serverThreadHelper handle friend resp
+      close handle
     serverThreadHelper :: ServerHandle -> Friend -> Data -> IO ()
     serverThreadHelper _ _ m | m == ByteString.empty = return ()
     serverThreadHelper handle friend msg = do
@@ -81,7 +82,6 @@ serveData port f = do
           P.payload = mmsg
           }
       handle <- send handle friend (show rmsg)
-      close handle
       (serverThreadHelper handle friend rest)
 
 
