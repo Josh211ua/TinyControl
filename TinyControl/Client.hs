@@ -7,7 +7,7 @@ import TinyControl.Common (Handle(..), Data(..), Friend, makeTimeDiff)
 import qualified TinyControl.Common as C
 import qualified TinyControl.Packet as P
 import TinyControl.Packet (DataPacket)
-import TinyControl.Time (diffTimeToUs, getTimeout, nextTimeout, toUs)
+import TinyControl.Time (diffTimeToS, getTimeout, nextTimeout, toUs)
 
 import Control.Monad.Trans.Class (lift)
 import Control.Monad.Trans.RWS.Lazy hiding (state)
@@ -62,7 +62,7 @@ firstPacket sock = do
          -- send Feedback Packet
          makeAndSendFeedbackPacket sock friend ss
          -- determine timeout interval
-         futureTimeout <- nextTimeout $ toUs (P.rtt packet)
+         futureTimeout <- nextTimeout (P.rtt packet)
          let ss' = ss {nextTimeoutTime = futureTimeout}
          -- begin running through states
          let nextPacket = receiveNextPacket sock ss'
@@ -81,7 +81,7 @@ initialState dp t_delay_start = ClientState {
 receiveNextPacket :: Socket -> ClientState -> IO (Maybe (String, Int, SockAddr))
 receiveNextPacket sock ss = do
     timeoutInterval <- getTimeout (nextTimeoutTime ss)
-    timeout timeoutInterval (recvFrom sock P.dataPacketSize)
+    timeout (toUs timeoutInterval) (recvFrom sock P.dataPacketSize)
 
 m1 :: IO (Maybe (String, Int, SockAddr)) -> ClientStateMonad (Socket, Friend) ()
 m1 result = do
@@ -143,7 +143,7 @@ makeFeedbackPacket s = do
     now <- getCurrentTime
     return P.FeedbackPacket {
         P.t_recvdata = (P.timeStamp (lastDataPacket s))
-      , P.t_delay = diffTimeToUs $ now `diffUTCTime` (lastDataPacketTime s)
+      , P.t_delay = diffTimeToS $ now `diffUTCTime` (lastDataPacketTime s)
       , P.x_recv = x_recv s
       , P.p = p s }
 
