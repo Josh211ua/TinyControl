@@ -72,7 +72,7 @@ serveData port f = do
     serverThreadHelper :: ServerHandle -> Friend -> Data -> IO ()
     serverThreadHelper _ _ m | m == ByteString.empty = return ()
     serverThreadHelper handle friend msg = do
-      let (mmsg, rest) = ByteString.splitAt 1000 msg
+      let (mmsg, rest) = ByteString.splitAt P.s msg
       now <- T.now
       let rmsg = P.DataPacket {
           P.seqNum = 0,
@@ -102,7 +102,7 @@ open port =
        -- Initailize State
        now <- T.now
        let theState = ServerState {
-            rto = T.usToDiffTime 2,
+            rto = T.sToDiffTime 2,
             tld = now,
             r = Nothing,
             x_recvset = Set.empty,
