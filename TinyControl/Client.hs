@@ -91,9 +91,12 @@ m1 result = do
     case (maybeD) of
          Just (d, _, _) -> do
              let p = read d
-             gotDataPacket p
-             let nextPacket = receiveNextPacket sock ss
-             m2 nextPacket
+             if P.isLastDataPacket p
+                then return ()
+                else do
+                    gotDataPacket p 
+                    let nextPacket = receiveNextPacket sock ss
+                    m2 nextPacket
          Nothing -> do
              expireFeedbackTimer
              let nextPacket = receiveNextPacket sock ss
@@ -107,9 +110,12 @@ m2 result = do
     case (maybeD) of
          Just (d, _, _) -> do
              let p = read d
-             gotDataPacket p
-             let nextPacket = receiveNextPacket sock ss
-             m2 nextPacket
+             if P.isLastDataPacket p
+                then return ()
+                else do
+                    gotDataPacket p
+                    let nextPacket = receiveNextPacket sock ss
+                    m2 nextPacket
          Nothing -> do
              expireFeedbackTimer
              lift $ makeAndSendFeedbackPacket sock f ss
@@ -124,10 +130,13 @@ m3 result = do
     case (maybeD) of
          Just (d, _, _) -> do
              let p = read d
-             gotDataPacket p
-             lift $ makeAndSendFeedbackPacket sock f ss
-             let nextPacket = receiveNextPacket sock ss
-             m1 nextPacket
+             if P.isLastDataPacket p
+                then return ()
+                else do
+                    gotDataPacket p
+                    lift $ makeAndSendFeedbackPacket sock f ss
+                    let nextPacket = receiveNextPacket sock ss
+                    m1 nextPacket
          Nothing -> do
              expireFeedbackTimer
              let nextPacket = receiveNextPacket sock ss
