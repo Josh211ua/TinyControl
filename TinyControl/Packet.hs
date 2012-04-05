@@ -33,7 +33,7 @@ instance Show DataPacket where
                     , timeStamp = t
                     , rtt = r
                     , payload = p } =
-        BLC.unpack ( encode (s, r, p) )
+       (\x -> trace (show (length x)) x) $ BLC.unpack ( encode (s, r, p) )
 
 instance Read DataPacket where
     readsPrec _ b =
@@ -54,7 +54,7 @@ instance Show FeedbackPacket where
                         , t_delay = d
                         , x_recv = x
                         , p = l} =
-        BLC.unpack ( encode (d, x, l) )
+       (\x -> (trace (show (length x))) x) $ BLC.unpack ( encode (d, x, l) )
 
 instance Read FeedbackPacket where
     readsPrec _ b =

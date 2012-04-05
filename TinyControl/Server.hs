@@ -38,7 +38,7 @@ import Network.Socket (
   , bindSocket
   , getNameInfo)
 import Network.BSD (HostName, defaultProtocol)
-
+import Debug.Trace(trace)
 import Data.Set (Set)
 import qualified Data.Set as Set
 import Data.List (genericDrop)
@@ -71,7 +71,7 @@ serveData port f = do
       serverThreadHelper handle friend resp
       close handle
     serverThreadHelper :: ServerHandle -> Friend -> Data -> IO ()
-    serverThreadHelper _ _ m | m == ByteString.empty = return ()
+    serverThreadHelper _ _ m | (ByteString.length m) == 0 = (trace "done") return ()
     serverThreadHelper handle friend msg = do
       let (mmsg, rest) = ByteString.splitAt P.s msg
       now <- T.now
