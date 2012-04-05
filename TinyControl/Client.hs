@@ -275,10 +275,11 @@ dealWithLossEvents lossEvents = do
           let sLoss = (fst b) + 1
           let tLoss' = tLoss b a sLoss
           let lastPacket' = lastPacket ss
+          let s_curr = fst $ lastPacketStamp ss
           case lastLossEvent ss of
             Just (_, tOld) -> if (sToDiffTime (P.rtt lastPacket') `addUTCTime` tOld) >= tLoss'
                                  then do
-                                    newLossInterval b a
+                                    newLossInterval b a s_curr
                                     dealWithRest xs
                                  else dealWithRest xs
             Nothing -> error "I have no idea what to put here"
@@ -297,7 +298,13 @@ dist :: SeqNum -> SeqNum -> Float
 dist a b = let s_a = toInteger a in let s_b = toInteger b in
                      fromInteger $ (s_a + s_max - s_b) `mod` s_max
 
-newLossInterval = undefined
+newLossInterval :: PacketStamp -> PacketStamp -> SeqNum -> ClientStateMonad ()
+newLossInterval (s_old, _) (s_new, _) s_curr = do
+    ss <- get
+    let newInterval = s_new - s_old
+    let currentInterval = s_curr - s_new + 1
+    let nextIntervals = currentInterval:newInterval:(take (n-2) (tail (intervals ss)))
+    put ss { intervals = nextIntervals }
 
 expireFeedbackTimer :: ClientStateMonad ()
 expireFeedbackTimer = do
