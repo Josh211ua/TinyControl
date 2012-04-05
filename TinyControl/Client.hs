@@ -40,6 +40,11 @@ data ClientState = ClientState { lastDataPacket :: P.DataPacket
                                }
                                deriving (Show, Read)
 
+type SeqNum = Int
+type Packet = (SeqNum, UTCTime)
+type PreLossEvent =(Packet, Packet) --- P_before, P_after
+type PacketHistory = (SeqNum, [PreLossEvent])
+
 type ClientStateMonad = RWST (Socket, Friend) ByteString ClientState IO
 
 wantData :: String -> String -> Data -> IO Data
@@ -177,6 +182,9 @@ expireFeedbackTimer :: ClientStateMonad ()
 expireFeedbackTimer = do
     (sock,f) <- ask
     ss <- get
+    let p' = calculateAverageLossEventRate
+    let x_recv' = calculateMeasuredReceiveRate
+    put $ ss {p = p', x_recv = x_recv'}
     lift $ makeAndSendFeedbackPacket sock f ss
     resetFeedbackTimer
 
@@ -186,6 +194,9 @@ resetFeedbackTimer = do
   let lastPack = lastDataPacket ss
   futureTimeout <- lift $ nextTimeout $ P.rtt lastPack
   put $ ss { nextTimeoutTime = futureTimeout }
+
+calculateAverageLossEventRate = undefined
+calculateMeasuredReceiveRate = undefined
 
 open :: String -> String -> IO (Socket, Friend)
 open hostname port =
