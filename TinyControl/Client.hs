@@ -207,7 +207,7 @@ addToPacketHistory dp newT = do
     let oldPacketHistory = packetHistory ss
     case (compare newSeq (oldSeq + 1)) of
          EQ -> put ss { lastPacket = Just (newSeq, newT) }
-         GT -> do 
+         GT -> do
             let newLossEvent = PreLossEvent {
                  before = (oldSeq, oldT)
                , after = (newSeq, newT)
@@ -215,17 +215,34 @@ addToPacketHistory dp newT = do
                }
             let newHistory = newLossEvent:oldPacketHistory
             put ss { packetHistory = newHistory
-                   , lastPacket = Just (newSeq, newT) 
+                   , lastPacket = Just (newSeq, newT)
                    }
-         LT -> error "Need to find gap to fill"
+         LT -> put ss {packetHistory = findAndFillGap oldPacketHistory (newSeq, newT)}
+              where
+                findAndFillGap :: [PreLossEvent] -> PacketStamp -> [PreLossEvent]
+                findAndFillGap history new = let (start,end) = break (inGap new) history in
+                  case end of
+                    [] -> history
+                    (match:rest) -> start ++ (fillGap new match) ++ rest
+                  where
+                    inGap :: PacketStamp -> PreLossEvent -> Bool
+                    inGap (s,t) (PreLossEvent {before=(s1,_),after=(s2,_)}) = and [compare s1 s == LT, compare s2 s == GT]
+                    fillGap :: PacketStamp -> PreLossEvent -> [PreLossEvent]
+                    fillGap c@(sc,_) ab = let a@(sa,_) = before ab in let b@(sb,_) = after ab in
+                      case (sa,sc,sb) of
+                        --assuming c/= b && c /= a
+                        _| and [sa + 1 == sc, sc + 1 == sb] -> [] --closed gap
+                        _| sa + 1 == sc -> [ab {before=c}] --is at start of gap
+                        _| sb - 1 == sc -> [ab {after=c}] --is at end of gap
+                        _ -> [ab {before=c},ab {after=c}] --split case
     return ()
 
 incrementMDUs :: SeqNum -> [PreLossEvent] -> [PreLossEvent]
-incrementMDUs s oldPacketHistory = do 
+incrementMDUs s oldPacketHistory = do
     ple <- oldPacketHistory
     let (afterSeq, _) = after ple
     if (afterSeq < s)
-       then return $ ple {mdu = (mdu ple) + 1} 
+       then return $ ple {mdu = (mdu ple) + 1}
        else return ple
 
 checkForLoss :: ClientStateMonad (Bool)
@@ -264,7 +281,7 @@ n = 8
 wI :: Int -> Float
 wI i = let nRat = fromInteger $ toInteger n in
    let iRat = fromInteger $ toInteger i in
-   if iRat < nRat / 2 
+   if iRat < nRat / 2
       then 1
       else 2 * (nRat - iRat) / (nRat + 2)
 
