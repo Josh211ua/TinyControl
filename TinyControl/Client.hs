@@ -171,7 +171,11 @@ gotDataPacket p = do
     --else
 
 expireFeedbackTimer :: ClientStateMonad (Socket, Friend) ()
-expireFeedbackTimer = do return ()
+expireFeedbackTimer = do
+    ss <- get
+    let lastPack = lastDataPacket ss
+    futureTimeout <- lift $ nextTimeout $ P.rtt lastPack
+    put $ ss { nextTimeoutTime = futureTimeout }
 
 open :: String -> String -> IO (Socket, Friend)
 open hostname port =
