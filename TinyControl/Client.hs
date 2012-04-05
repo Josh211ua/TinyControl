@@ -112,7 +112,7 @@ m1 result = do
              if P.isLastDataPacket p
                 then return ()
                 else do
-                    gotDataPacket p
+                    gotDataPacket p False
                     let nextPacket = receiveNextPacket sock ss
                     m2 nextPacket
          Nothing -> do
@@ -132,7 +132,7 @@ m2 result = do
              if P.isLastDataPacket p
                 then return ()
                 else do
-                    gotDataPacket p
+                    gotDataPacket p False
                     let nextPacket = receiveNextPacket sock ss
                     m2 nextPacket
          Nothing -> do
@@ -153,7 +153,7 @@ m3 result = do
              if P.isLastDataPacket p
                 then return ()
                 else do
-                    gotDataPacket p
+                    gotDataPacket p True
                     expireFeedbackTimer
                     let nextPacket = receiveNextPacket sock ss
                     m1 nextPacket
@@ -182,13 +182,27 @@ sendFeedbackPacket sock friend packet = do
     --  we are sending correctly
     send sock friend (show packet)
 
-gotDataPacket :: DataPacket -> ClientStateMonad ()
-gotDataPacket p = do
-    tell (P.payload p)
-    --addToPacketHistory
-    --if done
-    return ()
-    --else
+gotDataPacket :: DataPacket -> Bool -> ClientStateMonad ()
+gotDataPacket pack inM3 = do
+    ss <- get
+    tell (P.payload pack)
+    addToPacketHistory pack
+    loss <- checkForLoss
+    if loss || inM3
+       then do
+           let p' = calculateP $ intervals ss
+           let p_prev = p ss
+           put $ ss { p = p' }
+           if (p' > p_prev)
+              then expireFeedbackTimer
+              else return ()
+       else return ()
+
+addToPacketHistory :: DataPacket -> ClientStateMonad ()
+addToPacketHistory = undefined
+
+checkForLoss :: ClientStateMonad (Bool)
+checkForLoss = undefined
 
 expireFeedbackTimer :: ClientStateMonad ()
 expireFeedbackTimer = do
