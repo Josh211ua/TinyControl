@@ -246,7 +246,31 @@ checkForLoss = do
            return True
 
 dealWithLossEvents :: [PreLossEvent] -> ClientStateMonad ()
-dealWithLossEvents lossEvents = undefined
+dealWithLossEvents lossEvents = do
+    let sortedPackets = reverse lossEvents
+    dealWithRest lossEvents
+    where
+        dealWithRest [] = return ()
+        dealWithRest (PreLossEvent{ before = b
+                                  , after = a
+                                  ,  mdu = m}:xs) = do
+          ss <- get
+          let sLoss = (seqNum before) + 1
+          let tLoss' = tLoss before after sLoss
+          case lastPacket ss of
+             Nothing -> error "No idea what goes here either"
+             Just lastPacket' ->
+              case lastLossEvent ss of
+                Just (_, tOld) -> if (tOld + (rtt lastPacket')) >= tLoss'
+                                     then do 
+                                        newLossInterval before after
+                                        dealWithRest xs
+                                     else dealWithRest xs
+                Nothing -> error "I have no idea what to put here"
+
+tLoss :: PacketStamp -> PacketStamp -> SeqNum -> TimeStamp
+-- Going to assume sLoss is one after sBegin
+tLoss = undefined
 
 expireFeedbackTimer :: ClientStateMonad ()
 expireFeedbackTimer = do
