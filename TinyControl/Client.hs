@@ -12,6 +12,7 @@ import TinyControl.Time (diffTimeToS, getTimeout, nextTimeout, toUs)
 import Control.Monad.Trans.Class (lift)
 import Control.Monad.Trans.RWS.Lazy hiding (state)
 
+import Data.List (sortBy)
 import Data.ByteString (ByteString, append)
 import Data.ByteString.Char8 (pack, unpack)
 import Network.Socket (
@@ -44,7 +45,8 @@ data PreLossEvent = PreLossEvent { before :: PacketStamp
 data ClientState = ClientState { intervals :: [Interval]
                                , packetHistory :: [ PreLossEvent ]
                                , lastLossEvent :: Maybe PacketStamp
-                               , lastPacket :: PacketStamp
+                               , lastPacketStamp :: PacketStamp
+                               , lastPacket :: DataPacket
                                , nextTimeoutTime :: UTCTime
                                , p :: Float
                                , x_recv :: Int
@@ -78,14 +80,15 @@ firstPacket sock = do
          -- begin running through states
          let nextPacket = receiveNextPacket sock ss'
          (_, _, w) <- runRWST (m1 nextPacket) (sock, friend) ss'
-         return $ (P.payload packet) `append` w
+         return $ foldr (\(_, bs) acc -> acc `append` bs) (P.payload packet) (sortBy (\(s1,_) (s2,_) -> compare s1 s2) w)
 
 initialState :: P.DataPacket -> UTCTime -> ClientState
 initialState dp t_delay_start = ClientState {
      intervals = []
    , packetHistory = []
    , lastLossEvent = Nothing
-   , lastPacket = (dp, t_delay_start)
+   , lastPacket = dp
+   , lastPacketStamp = (P.seqNum dp, t_delay_start)
    , nextTimeoutTime = read "0000-00-00 00:00:00"
    , p = 0
    , x_recv = 0
@@ -168,7 +171,7 @@ makeFeedbackPacket s = do
     now <- getCurrentTime
     return P.FeedbackPacket {
         P.t_recvdata = (P.timeStamp (lastPacket s))
-      , P.t_delay = diffTimeToS $ now `diffUTCTime` (lastPacket s)
+      , P.t_delay = diffTimeToS $ now `diffUTCTime` snd (lastPacketStamp s)
       , P.x_recv = x_recv s
       , P.p = p s }
 
@@ -182,7 +185,7 @@ gotDataPacket :: DataPacket -> Bool -> ClientStateMonad ()
 gotDataPacket pack inM3 = do
     ss <- get
     timeStamp <- lift $ getCurrentTime
-    tell ((P.seqNum pack),(P.payload pack))
+    tell [((P.seqNum pack),(P.payload pack))]
     addToPacketHistory pack timeStamp
     loss <- checkForLoss
     if loss || inM3
@@ -199,10 +202,10 @@ addToPacketHistory :: DataPacket -> TimeStamp -> ClientStateMonad ()
 addToPacketHistory dp newT = do
     ss <- get
     let newSeq = P.seqNum dp
-    let (oldSeq, oldT) = lastPacket ss
+    let (oldSeq, oldT) = lastPacketStamp ss
     let oldPacketHistory = packetHistory ss
     case (compare newSeq (oldSeq + 1)) of
-         EQ -> put ss { lastPacket = Just (newSeq, newT) }
+         EQ -> put ss { lastPacketStamp = (newSeq, newT), lastPacket = dp }
          GT -> do
             let newLossEvent = PreLossEvent {
                  before = (oldSeq, oldT)
@@ -211,7 +214,8 @@ addToPacketHistory dp newT = do
                }
             let newHistory = newLossEvent:oldPacketHistory
             put ss { packetHistory = newHistory
-                   , lastPacket = Just (newSeq, newT)
+                   , lastPacketStamp = (newSeq, newT)
+                   , lastPacket = dp
                    }
          LT -> put ss {packetHistory = findAndFillGap oldPacketHistory (newSeq, newT)}
               where
@@ -248,7 +252,7 @@ checkForLoss :: ClientStateMonad (Bool)
 -- Note must also deal with the loss here
 checkForLoss = do
     ss <- get
-    let Just(lastPacketSeq, _) = lastPacket ss
+    let (lastPacketSeq, _) = lastPacketStamp ss
     let incrementHistory = incrementMDUs (lastPacketSeq) (packetHistory ss)
     let (newHistory, lossEvent) = span (\x -> mdu x <= mduC) incrementHistory
     put $ ss {packetHistory = newHistory}
@@ -262,24 +266,22 @@ dealWithLossEvents :: [PreLossEvent] -> ClientStateMonad ()
 dealWithLossEvents lossEvents = do
     let sortedPackets = reverse lossEvents
     dealWithRest lossEvents
-    where
+    where -- TODO deal with loss ranges of length > 1
         dealWithRest [] = return ()
         dealWithRest (PreLossEvent{ before = b
                                   , after = a
                                   ,  mdu = m}:xs) = do
           ss <- get
-          let sLoss = (P.seqNum before) + 1
-          let tLoss' = tLoss before after sLoss
-          case lastPacket ss of
-             Nothing -> error "No idea what goes here either"
-             Just lastPacket' ->
-              case lastLossEvent ss of
-                Just (_, tOld) -> if (tOld + (P.rtt lastPacket')) >= tLoss'
-                                     then do 
-                                        newLossInterval before after
-                                        dealWithRest xs
-                                     else dealWithRest xs
-                Nothing -> error "I have no idea what to put here"
+          let sLoss = (fst b) + 1
+          let tLoss' = tLoss b a sLoss
+          let lastPacket' = lastPacket ss
+          case lastLossEvent ss of
+            Just (_, tOld) -> if (tOld + (P.rtt lastPacket')) >= tLoss'
+                                 then do
+                                    newLossInterval b a
+                                    dealWithRest xs
+                                 else dealWithRest xs
+            Nothing -> error "I have no idea what to put here"
 
 tLoss :: PacketStamp -> PacketStamp -> SeqNum -> TimeStamp
 -- Going to assume sLoss is one after sBegin
