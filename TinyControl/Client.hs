@@ -70,7 +70,7 @@ firstPacket sock = do
          return $ (P.payload packet) `append` w
 
 initialState :: P.DataPacket -> UTCTime -> ClientState
-initialState dp t_delay_start = ClientState { 
+initialState dp t_delay_start = ClientState {
      lastDataPacket = dp
    , lastDataPacketTime = t_delay_start
    , nextTimeoutTime = read "0000-00-00 00:00:00"
@@ -85,6 +85,7 @@ receiveNextPacket sock ss = do
 
 m1 :: IO (Maybe (String, Int, SockAddr)) -> ClientStateMonad (Socket, Friend) ()
 m1 result = do
+    lift $ print "entering m1"
     (sock, f) <- ask
     ss <- get
     maybeD <- lift result
@@ -94,16 +95,17 @@ m1 result = do
              if P.isLastDataPacket p
                 then return ()
                 else do
-                    gotDataPacket p 
+                    gotDataPacket p
                     let nextPacket = receiveNextPacket sock ss
                     m2 nextPacket
          Nothing -> do
              expireFeedbackTimer
              let nextPacket = receiveNextPacket sock ss
              m3 nextPacket
-    
+
 m2 :: IO (Maybe (String, Int, SockAddr)) -> ClientStateMonad (Socket, Friend) ()
 m2 result = do
+    lift $ print "entering m2"
     (sock, f) <- ask
     ss <- get
     maybeD <- lift result
@@ -124,6 +126,7 @@ m2 result = do
 
 m3 :: IO (Maybe (String, Int, SockAddr)) -> ClientStateMonad (Socket, Friend) ()
 m3 result = do
+    lift $ print "entering m3"
     (sock, f) <- ask
     ss <- get
     maybeD <- lift result

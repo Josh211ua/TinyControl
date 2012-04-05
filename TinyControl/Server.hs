@@ -78,7 +78,7 @@ serveData port f = do
       let rmsg = P.DataPacket {
           P.seqNum = 0,
           P.timeStamp = now,
-          P.rtt = 0,
+          P.rtt = 2,
           P.payload = mmsg
           }
       handle <- send handle friend (show rmsg)
