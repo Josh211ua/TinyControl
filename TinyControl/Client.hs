@@ -53,11 +53,6 @@ data ClientState = ClientState { intervals :: [Interval]
                                }
                                deriving (Show, Read)
 
-type SeqNum = Int
-type Packet = (SeqNum, UTCTime)
-type PreLossEvent =(Packet, Packet) --- P_before, P_after
-type PacketHistory = (SeqNum, [PreLossEvent])
-
 type ClientStateMonad = RWST (Socket, Friend) ByteString ClientState IO
 
 wantData :: String -> String -> Data -> IO Data
@@ -199,7 +194,7 @@ expireFeedbackTimer :: ClientStateMonad ()
 expireFeedbackTimer = do
     (sock,f) <- ask
     ss <- get
-    let p' = calculateAverageLossEventRate
+    let p' = calculateP (intervals ss)
     let x_recv' = calculateMeasuredReceiveRate
     put $ ss {p = p', x_recv = x_recv'}
     lift $ makeAndSendFeedbackPacket sock f ss
@@ -212,7 +207,33 @@ resetFeedbackTimer = do
   futureTimeout <- lift $ nextTimeout $ P.rtt lastPack
   put $ ss { nextTimeoutTime = futureTimeout }
 
-calculateAverageLossEventRate = undefined
+-- Calculate P:
+calculateP :: [Interval] -> Float
+calculateP intervals = 1 / (iMean intervals)
+
+n :: Int
+n = 8
+
+wI :: Int -> Float
+wI i = let nRat = fromInteger $ toInteger n in
+   let iRat = fromInteger $ toInteger i in
+   if iRat < nRat / 2 
+      then 1
+      else 2 * (nRat - iRat) / (nRat + 2)
+
+wS :: [Float]
+wS = [wI i | i <- [1..n]]
+
+iMean :: [Interval] -> Float
+iMean intervals = (fromInteger $ toInteger $ iTot intervals) / wTot
+
+iTot :: [Interval] -> Int
+iTot intervals = sum intervals
+
+wTot :: Float
+wTot = sum wS
+
+-- Calculate x_recv:
 calculateMeasuredReceiveRate = undefined
 
 -- UDP Operations
