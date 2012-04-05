@@ -185,7 +185,7 @@ sendFeedbackPacket sock friend packet = do
 gotDataPacket :: DataPacket -> Bool -> ClientStateMonad ()
 gotDataPacket pack inM3 = do
     ss <- get
-    timeStamp <- lift $ currentTime
+    timeStamp <- lift $ getCurrentTime
     tell (P.payload pack)
     addToPacketHistory pack timeStamp
     loss <- checkForLoss
@@ -202,8 +202,22 @@ gotDataPacket pack inM3 = do
 addToPacketHistory :: DataPacket -> TimeStamp -> ClientStateMonad ()
 addToPacketHistory dp newT = do
     ss <- get
-    let (oldSeq, oldT) = lastPacket ss
-    let new
+    let Just (oldSeq, oldT) = lastPacket ss
+    let newSeq = P.seqNum dp
+    let oldPacketHistory = packetHistory ss
+    case (compare newSeq (oldSeq + 1)) of
+         EQ -> put ss { lastPacket = Just (newSeq, newT) }
+         GT -> do 
+            let newLossEvent = PreLossEvent {
+                 before = (oldSeq, oldT)
+               , after = (newSeq, newT)
+               , mdu = 0
+               }
+            put ss { packetHistory = newLossEvent:oldPacketHistory
+                   , lastPacket = Just (newSeq, newT) 
+                   }
+         LT -> error ""
+    return ()
 
 checkForLoss :: ClientStateMonad (Bool)
 checkForLoss = undefined
