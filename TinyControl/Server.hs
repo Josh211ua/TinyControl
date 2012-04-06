@@ -123,7 +123,7 @@ expireNoFeedbackTimer :: ServerStateMonad ()
 expireNoFeedbackTimer = do
     ss <- get
     error ""
-      
+
 
 
 handlePacket :: P.FeedbackPacket ->  ServerStateMonad ()
@@ -156,13 +156,13 @@ sOverTmbi = (intToFloat P.s) / t_mbi
 
 updateLimits :: Float -> Int -> NominalDiffTime ->
         Float -> UTCTime -> UTCTime -> (Int, UTCTime, [(UTCTime, Int)])
-updateLimits timer_limit x r p t_now tld = 
+updateLimits timer_limit x r p t_now tld =
     let x_recvset' = nextXSet timer_limit t_now in
       let (x',tld') = updateRate x_recvset' x r p t_now tld in
           (x', tld', x_recvset')
       where nextXSet timer_limit t_now =
               if (timer_limit < sOverTmbi)
-                 then [(t_now, floor (sOverTmbi / 2))] 
+                 then [(t_now, floor (sOverTmbi / 2))]
                  else [(t_now, floor (timer_limit / 2))]
 
 
