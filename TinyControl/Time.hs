@@ -3,6 +3,7 @@ module TinyControl.Time
   , sToDiffTime
   , nextTimeoutNDT
   , nextTimeoutSec
+  , nextTimeoutSecPure
   , getTimeout
   , now
   , toUs
@@ -32,9 +33,15 @@ nextTimeoutNDT ndt = do
 nextTimeoutSec :: Int -> IO UTCTime
 nextTimeoutSec s = do
     now <- getCurrentTime
-    let diff = secondsToDiffTime $ fromIntegral s
-    let next = addUTCTime (realToFrac diff) now
-    return next
+    return $ nextTimeoutSecPure s now
+
+nextTimeoutSecPure :: Int -> UTCTime -> UTCTime
+nextTimeoutSecPure s now =
+    let diff = secondsToDiffTime $ fromIntegral s in
+    let next = addUTCTime (realToFrac diff) now in
+    next
+
+
 
 -- number of seconds from now to given time
 getTimeout :: UTCTime -> IO Int

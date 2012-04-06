@@ -46,6 +46,7 @@ data ServerState = ServerState { rto :: NominalDiffTime -- time between nfdbkTim
                                , x_recvset :: Set (UTCTime, Int) -- set of Xrecvs
                                , x :: Int -- send rate, bytes per sec
                                , sendMoreTime :: UTCTime
+                               , howManyMore :: Int
                                , noFeedBackTime :: UTCTime
                                }
                                deriving (Show)
@@ -72,16 +73,24 @@ serveData port f = do
       resp <- f msg
       now <- T.now
       noFeedBackTimer <- T.nextTimeoutSec 2
+      let (packetPerInterval, sendMoreT) = howMuchAndWhen P.s now
       let theState = ServerState { rto = T.sToDiffTime 2
                   , tld = now
                   , r = Nothing
                   , x_recvset = Set.empty
                   , x = P.s
-                  , sendMoreTime = now
+                  , sendMoreTime = sendMoreT
+                  , howManyMore = packetPerInterval
                   , noFeedBackTime = noFeedBackTimer
                   }
       (a,s,w) <- runRWST (serverThreadHelper resp) (sock,friend) theState
       sClose sock
+    howMuchAndWhen :: Int -> UTCTime -> (Int, UTCTime)
+    howMuchAndWhen bytesPerSecond now =
+      let fractionalP =bytesPerSecond / P.s in
+      let amount = ceiling fractionalP in
+      let seconds = ceiling $ intToFloat (amount * P.s) / intToFloat bytesPerSecond in
+      (amount, T.nextTimeoutSecPure seconds now)
     serverThreadHelper :: Data -> ServerStateMonad ()
     serverThreadHelper m | (ByteString.length m) == 0 = (trace "done") return ()
     serverThreadHelper msg = do
