@@ -242,7 +242,9 @@ recv = do
           let (packNum, intervalEnd) = howMuchAndWhen (howManyMore state) (sendMoreTime state) in do
             put $ state {sendMoreTime = intervalEnd, howManyMore = packNum}
             serverThreadHelper --send
-        else undefined -- reset NOFEEDBACKTIMER; goto recv
+        else do -- reset NOFEEDBACKTIMER; goto recv
+          expireNoFeedbackTimer
+          recv
       Just (msg, _, _) -> do
         tell (["Recv'd: " ++ msg])
         handlePacket (read msg)
