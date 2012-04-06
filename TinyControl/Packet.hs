@@ -57,7 +57,6 @@ instance Show FeedbackPacket where
                         , p = l} =
        (\x -> (trace (show (length x))) x) $ BLC.unpack ( encode (d, x, l) )
 
--- (\x -> (trace (show (BLC.length x))) x) $
 instance Read FeedbackPacket where
     readsPrec _ b =
         let (d, x, l) = decode $  BLC.pack $ b in
