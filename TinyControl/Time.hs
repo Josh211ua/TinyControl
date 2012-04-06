@@ -3,6 +3,7 @@ module TinyControl.Time
   , sToDiffTime
   , nextTimeoutNDT
   , nextTimeoutSec
+  , nextTimeoutSecPure
   , getTimeout
   , now
   , toUs
