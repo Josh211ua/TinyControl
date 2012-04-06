@@ -133,7 +133,10 @@ handlePacket pack = do
            , x = x'
            , tld = tld'
            }
-    error "Must reset no feedback timer to rto seconds"
+    resetFeedbackTimer
+
+resetFeedbackTimer :: ServerStateMonad ()
+resetFeedbackTimer = undefined
 
 intToFloat :: Int -> Float
 intToFloat x = fromInteger $ toInteger x
