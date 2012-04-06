@@ -39,11 +39,11 @@ import Network.BSD (HostName, defaultProtocol)
 import Debug.Trace(trace)
 import Data.Set (Set)
 import qualified Data.Set as Set
-import Data.List (genericDrop)
+import Data.List (genericDrop, maximumBy)
 data ServerState = ServerState { rto :: NominalDiffTime -- time between nfdbkTimer expirations
                                , tld :: UTCTime         -- time last doubled
                                , r :: Maybe NominalDiffTime -- estimate of RTT
-                               , x_recvset :: Set (UTCTime, Int) -- set of Xrecvs
+                               , x_recvset :: [(UTCTime, Int)] -- set of Xrecvs
                                , x :: Int -- send rate, bytes per sec
                                , sendMoreTime :: UTCTime
                                , howManyMore :: Int
@@ -78,7 +78,7 @@ serveData port f = do
       let theState = ServerState { rto = T.sToDiffTime 2
                   , tld = now
                   , r = Nothing
-                  , x_recvset = Set.empty
+                  , x_recvset = []
                   , x = P.s
                   , sendMoreTime = sendMoreT
                   , howManyMore = packetPerInterval
@@ -121,16 +121,64 @@ expireNoFeedbackTimer = undefined
 handlePacket :: P.FeedbackPacket ->  ServerStateMonad ()
 handlePacket pack = do
     ss <- get
-    r_sample <- lift $ calculateRSample (P.t_recvdata pack) (P.t_delay pack)
+    t_now <- lift $ T.now
+    let r_sample = calculateRSample t_now (P.t_recvdata pack) (P.t_delay pack)
+    let r' = updateR (r ss) r_sample
+    let rto' = updateRto r' (x ss)
+    let x_recvset' = updateXRecvset (x_recvset ss)
+    let (x', tld') = updateRate (x_recvset') (x ss) 
+            (r') (P.p pack) (t_now) (tld ss)
     error "Not implemented"
 
-calculateRSample :: UTCTime -> Int -> IO NominalDiffTime
-calculateRSample t_recvdata t_delay = do
-    t_now <- T.now
-    return (T.sToDiffTime $ (T.diffTimeToS $ t_now `diffUTCTime` t_recvdata) - t_delay)
+intToFloat :: Int -> Float
+intToFloat x = fromInteger $ toInteger x
 
+calculateRSample :: UTCTime -> UTCTime -> Int -> NominalDiffTime
+calculateRSample t_now t_recvdata t_delay = do
+    T.sToDiffTime $ (T.diffTimeToS $ t_now `diffUTCTime` t_recvdata) - t_delay
 
+q :: Float
+q = 0.9
 
+updateR :: Maybe NominalDiffTime -> NominalDiffTime -> NominalDiffTime
+updateR r_old r_sample = case (r_old) of
+    Nothing -> r_sample
+    Just (r) -> T.sToDiffTime $ floor $
+        q * (fromInteger $ toInteger $ T.diffTimeToS r) + 
+        (1 - q) * (fromInteger $ toInteger $ T.diffTimeToS r_sample)
+
+updateRto :: NominalDiffTime -> Int -> NominalDiffTime
+updateRto r x = T.sToDiffTime $ max 
+    (4 * (T.diffTimeToS r)) 
+    (floor $ (intToFloat $ 2 * P.s) / (intToFloat $ x))
+
+t_mbi :: Float
+t_mbi = 64
+
+w_init :: Float
+w_init = intToFloat $ min (4 * P.s) (max (2 * P.s) (4380))
+
+initialRate :: NominalDiffTime -> Float
+initialRate r = (w_init) / (intToFloat $ T.diffTimeToS r)
+
+updateXRecvset = undefined
+
+updateRate :: [(UTCTime, Int)] -> Int -> NominalDiffTime -> 
+    Float -> UTCTime -> UTCTime -> (Int, UTCTime)
+updateRate x_recvset x r p t_now tld = 
+    if p > 0
+      then ((xMaxMin (xBps r p) (floor $ ((intToFloat P.s) / t_mbi))), tld)
+      else if (t_now `diffUTCTime` tld) >= r
+        then ((xMaxMin (2 * x) (floor $ initialRate r)), t_now)
+        else (x, tld)
+    where recv_limit = snd $ maximumBy (\(x1,y1) (x2,y2) -> compare y1 y2) x_recvset
+          xMaxMin :: Int -> Int -> Int
+          xMaxMin a b = max (min (a) (recv_limit)) (b)
+    
+xBps :: NominalDiffTime -> Float -> Int
+xBps r p = let r' = (intToFloat $ T.diffTimeToS r)
+  in floor $ (intToFloat P.s) / 
+        (r' * (sqrt (2 * p / 3)) + 12 * (sqrt (3 * p / 8)) * p * (1 + 32 * p^2))
 
 -- Network Operations
 open :: String -> IO (Socket)
