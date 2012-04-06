@@ -28,13 +28,13 @@ defaultPacket = DataPacket { seqNum = 0
                             , payload = BC.pack (replicate 1000 'm')
                             }
 
---(\x -> trace (show (length x)) x) $
+
 instance Show DataPacket where
     show DataPacket { seqNum = s
                     , timeStamp = t
                     , rtt = r
                     , payload = p } =
-        BLC.unpack ( encode (s, r, p) )
+        (\x -> trace (show (length x)) x) $ BLC.unpack ( encode (s, r, p) )
 
 instance Read DataPacket where
     readsPrec _ b =
