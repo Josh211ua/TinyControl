@@ -156,7 +156,7 @@ handlePacket pack = do
     let r_sample = calculateRSample t_now (P.t_recvdata pack) (P.t_delay pack)
     let r' = updateR (r ss) r_sample
     let rto' = updateRto r' (x ss)
-    let x_recvset' = updateXRecvset (x_recvset ss) (r') (t_now)
+    let x_recvset' = (t_now, P.x_recv pack):(updateXRecvset (x_recvset ss) (r') (t_now))
     let (x', tld') = (\y -> trace ("x': " ++ show y) y) $ updateRate (x_recvset') (x ss)
             (r') (P.p pack) (t_now) (tld ss)
     put ss { r = Just r'
