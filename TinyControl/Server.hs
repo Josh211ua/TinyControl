@@ -43,7 +43,7 @@ import Data.List (genericDrop, maximumBy)
 data ServerState = ServerState { rto :: NominalDiffTime -- time between nfdbkTimer expirations
                                , tld :: UTCTime         -- time last doubled
                                , r :: Maybe NominalDiffTime -- estimate of RTT
-                               , x_recvset :: Set (UTCTime, Int) -- set of Xrecvs
+                               , x_recvset :: [(UTCTime, Int)] -- set of Xrecvs
                                , x :: Int -- send rate, bytes per sec
                                , sendMoreTime :: UTCTime
                                , howManyMore :: Int
@@ -77,7 +77,7 @@ serveData port f = do
       let theState = ServerState { rto = T.sToDiffTime 2
                   , tld = now
                   , r = Nothing
-                  , x_recvset = Set.empty
+                  , x_recvset = []
                   , x = P.s
                   , sendMoreTime = sendMoreT
                   , howManyMore = packetPerInterval
@@ -155,6 +155,8 @@ initialRate r = (w_init) / (intToFloat $ T.diffTimeToS r)
 
 updateXRecvset = undefined
 
+updateRate :: [(UTCTime, Int)] -> Int -> NominalDiffTime -> 
+    Float -> UTCTime -> UTCTime -> (Int, UTCTime)
 updateRate x_recvset x r p t_now tld = 
     if p > 0
       then ((xMaxMin (xBps r p) (floor $ ((intToFloat P.s) / t_mbi))), tld)
