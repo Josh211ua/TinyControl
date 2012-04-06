@@ -103,6 +103,7 @@ handlePacket :: P.FeedbackPacket ->  ServerStateMonad ()
 handlePacket pack = do
     ss <- get
     r_sample <- lift $ calculateRSample (P.t_recvdata pack) (P.t_delay pack)
+    let r' = updateR (r ss) r_sample
     error "Not implemented"
     
 calculateRSample :: UTCTime -> Int -> IO NominalDiffTime
@@ -110,6 +111,15 @@ calculateRSample t_recvdata t_delay = do
     t_now <- T.now
     return (T.sToDiffTime $ (T.diffTimeToS $ t_now `diffUTCTime` t_recvdata) - t_delay)
 
+q :: Float
+q = 0.9
+
+updateR :: Maybe NominalDiffTime -> NominalDiffTime -> NominalDiffTime
+updateR r_old r_sample = case (r_old) of
+    Nothing -> r_sample
+    Just (r) -> T.sToDiffTime $ floor $
+        q * (fromInteger $ toInteger $ T.diffTimeToS r) + 
+        (1 - q) * (fromInteger $ toInteger $ T.diffTimeToS r_sample)
 
 
 
