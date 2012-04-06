@@ -242,8 +242,7 @@ recv = do
         else undefined -- reset NOFEEDBACKTIMER; goto recv
       Just (msg, _, _) -> do
         tell (["Recv'd: " ++ msg])
-        let feedbackPacket = (read msg)::P.FeedbackPacket
-        -- TODO: calculate stats based on feedback
+        handlePacket (read msg)
         recv
     where
       soonerTime x y = if x `soonerThan` y then x else y
