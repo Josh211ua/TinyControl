@@ -1,7 +1,8 @@
 module TinyControl.Time
   ( diffTimeToS
   , sToDiffTime
-  , nextTimeout
+  , nextTimeoutNDT
+  , nextTimeoutSec
   , getTimeout
   , now
   , toUs
@@ -22,14 +23,20 @@ diffTimeToS diff = floor $ toRational $ diff
 sToDiffTime :: Int -> NominalDiffTime
 sToDiffTime s = realToFrac $ secondsToDiffTime (fromIntegral s)
 
--- Returns a time us seconds after now
-nextTimeout :: Int -> IO UTCTime
-nextTimeout s = do
+nextTimeoutNDT :: NominalDiffTime -> IO UTCTime
+nextTimeoutNDT ndt = do
+  currentTime <- now
+  return (addUTCTime ndt currentTime)
+
+-- Returns a time s seconds after now
+nextTimeoutSec :: Int -> IO UTCTime
+nextTimeoutSec s = do
     now <- getCurrentTime
     let diff = secondsToDiffTime $ fromIntegral s
     let next = addUTCTime (realToFrac diff) now
     return next
 
+-- number of seconds from now to given time
 getTimeout :: UTCTime -> IO Int
 getTimeout t = do
     now <- getCurrentTime
