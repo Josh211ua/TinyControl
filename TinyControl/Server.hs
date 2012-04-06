@@ -127,15 +127,15 @@ expireNoFeedbackTimer = do
     t_now <- lift T.now
     let x_recv = recv_limit (x_recvset ss) in
       case (r ss) of
-            Nothing -> do 
-                let x' = floor $ max ((intToFloat (x ss)) / 2) (sOverTmbi) 
+            Nothing -> do
+                let x' = floor $ max ((intToFloat (x ss)) / 2) (sOverTmbi)
                 put ss { x = x' }
-            Just r' -> 
+            Just r' ->
                 let p' = case lastPacket ss of
                         Nothing -> 0
                         Just pack -> P.p pack in
-                    if p' == 0 
-                       then do 
+                    if p' == 0
+                       then do
                          let x' = floor $ max ((intToFloat (x ss)) / 2) (sOverTmbi)
                          put ss { x = x' }
                        else
@@ -235,7 +235,7 @@ updateRate x_recvset x r p t_now tld =
         then ((xMaxMin (2 * x) (floor $ initialRate r)), t_now)
         else (x, tld)
     where xMaxMin :: Int -> Int -> Int
-          xMaxMin a b = max (min (a) (recv_limit x_recvset)) (b)
+          xMaxMin a b = max (min (a) (2 * (recv_limit x_recvset))) (b)
 
 recv_limit :: [(UTCTime, Int)] -> Int
 recv_limit x_recvset = snd $ maximumBy (\(x1,y1) (x2,y2) -> compare y1 y2) x_recvset
