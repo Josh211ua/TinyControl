@@ -89,8 +89,7 @@ serveData port f = do
       sClose sock
     howMuchAndWhen :: Int -> UTCTime -> (Int, UTCTime)
     howMuchAndWhen bytesPerSecond now =
-      let fractionalP =bytesPerSecond / P.s in
-      let amount = ceiling fractionalP in
+      let amount = ceiling (intToFloat bytesPerSecond /intToFloat P.s) in
       let seconds = ceiling $ intToFloat (amount * P.s) / intToFloat bytesPerSecond in
       (amount, T.nextTimeoutSecPure seconds now)
     serverThreadHelper :: ServerStateMonad ()
@@ -112,7 +111,7 @@ serveData port f = do
               P.payload = mmsg
               }
           lift $ send sock friend (show rmsg)
-          (serverThreadHelper rest)
+          serverThreadHelper
 
 -- Helper Methods
 expireNoFeedbackTimer :: ServerStateMonad ()
@@ -126,7 +125,7 @@ handlePacket pack = do
     let r' = updateR (r ss) r_sample
     let rto' = updateRto r' (x ss)
     let x_recvset' = updateXRecvset (x_recvset ss)
-    let (x', tld') = updateRate (x_recvset') (x ss) 
+    let (x', tld') = updateRate (x_recvset') (x ss)
             (r') (P.p pack) (t_now) (tld ss)
     error "Not implemented"
 
@@ -144,12 +143,12 @@ updateR :: Maybe NominalDiffTime -> NominalDiffTime -> NominalDiffTime
 updateR r_old r_sample = case (r_old) of
     Nothing -> r_sample
     Just (r) -> T.sToDiffTime $ floor $
-        q * (fromInteger $ toInteger $ T.diffTimeToS r) + 
+        q * (fromInteger $ toInteger $ T.diffTimeToS r) +
         (1 - q) * (fromInteger $ toInteger $ T.diffTimeToS r_sample)
 
 updateRto :: NominalDiffTime -> Int -> NominalDiffTime
-updateRto r x = T.sToDiffTime $ max 
-    (4 * (T.diffTimeToS r)) 
+updateRto r x = T.sToDiffTime $ max
+    (4 * (T.diffTimeToS r))
     (floor $ (intToFloat $ 2 * P.s) / (intToFloat $ x))
 
 t_mbi :: Float
@@ -163,9 +162,9 @@ initialRate r = (w_init) / (intToFloat $ T.diffTimeToS r)
 
 updateXRecvset = undefined
 
-updateRate :: [(UTCTime, Int)] -> Int -> NominalDiffTime -> 
+updateRate :: [(UTCTime, Int)] -> Int -> NominalDiffTime ->
     Float -> UTCTime -> UTCTime -> (Int, UTCTime)
-updateRate x_recvset x r p t_now tld = 
+updateRate x_recvset x r p t_now tld =
     if p > 0
       then ((xMaxMin (xBps r p) (floor $ ((intToFloat P.s) / t_mbi))), tld)
       else if (t_now `diffUTCTime` tld) >= r
@@ -174,10 +173,10 @@ updateRate x_recvset x r p t_now tld =
     where recv_limit = snd $ maximumBy (\(x1,y1) (x2,y2) -> compare y1 y2) x_recvset
           xMaxMin :: Int -> Int -> Int
           xMaxMin a b = max (min (a) (recv_limit)) (b)
-    
+
 xBps :: NominalDiffTime -> Float -> Int
 xBps r p = let r' = (intToFloat $ T.diffTimeToS r)
-  in floor $ (intToFloat P.s) / 
+  in floor $ (intToFloat P.s) /
         (r' * (sqrt (2 * p / 3)) + 12 * (sqrt (3 * p / 8)) * p * (1 + 32 * p^2))
 
 -- Network Operations
@@ -225,7 +224,7 @@ srecv s =
       return (addr, d)
 
 
-recv :: ServerStateMonad (P.FeedbackPacket)
+recv :: ServerStateMonad ()
 recv = do
     state <- get
     let sendTime = sendMoreTime state
