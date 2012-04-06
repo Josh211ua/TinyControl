@@ -8,9 +8,7 @@ import qualified TinyControl.Common as C
 import qualified TinyControl.Packet as P
 import qualified TinyControl.Time as T
 
---import System.Time (TimeDiff(..), CalendarTime, getClockTime, toCalendarTime)
-import Data.Time.Clock (NominalDiffTime)
-import Data.Time (UTCTime)
+import Data.Time (UTCTime, NominalDiffTime, diffUTCTime)
 
 
 import Control.Monad.Trans.Class (lift)
@@ -51,6 +49,7 @@ data ServerState = ServerState { rto :: NominalDiffTime -- time between nfdbkTim
                                , noFeedBackTime :: UTCTime
                                }
                                deriving (Show)
+type TimeStamp = UTCTime
 
 type ServerHandle = Handle ServerState
 
@@ -98,7 +97,25 @@ serveData port f = do
       lift $ send sock friend (show rmsg)
       (serverThreadHelper rest)
 
+-- Helper Methods
+expireNoFeedbackTimer :: ServerStateMonad ()
+expireNoFeedbackTimer = undefined
 
+handlePacket :: P.FeedbackPacket ->  ServerStateMonad ()
+handlePacket pack = do
+    ss <- get
+    r_sample <- lift $ calculateRSample (P.t_recvdata pack) (P.t_delay pack)
+    error "Not implemented"
+
+calculateRSample :: UTCTime -> Int -> IO NominalDiffTime
+calculateRSample t_recvdata t_delay = do
+    t_now <- T.now
+    return (T.sToDiffTime $ (T.diffTimeToS $ t_now `diffUTCTime` t_recvdata) - t_delay)
+
+
+
+
+-- Network Operations
 open :: String -> IO (Socket)
 open port =
     do -- Look up the hostname and port.  Either raises an exception
