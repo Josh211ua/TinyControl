@@ -120,7 +120,11 @@ serverThreadHelper = do
 
 -- Helper Methods
 expireNoFeedbackTimer :: ServerStateMonad ()
-expireNoFeedbackTimer = undefined
+expireNoFeedbackTimer = do
+    ss <- get
+    error ""
+      
+
 
 handlePacket :: P.FeedbackPacket ->  ServerStateMonad ()
 handlePacket pack = do
@@ -146,6 +150,21 @@ resetFeedbackTimer = do
   let diff = rto state
   t <- lift $ T.nextTimeoutNDT diff
   put state {noFeedBackTime = t}
+
+sOverTmbi :: Float
+sOverTmbi = (intToFloat P.s) / t_mbi
+
+updateLimits :: Float -> Int -> NominalDiffTime ->
+        Float -> UTCTime -> UTCTime -> (Int, UTCTime, [(UTCTime, Int)])
+updateLimits timer_limit x r p t_now tld = 
+    let x_recvset' = nextXSet timer_limit t_now in
+      let (x',tld') = updateRate x_recvset' x r p t_now tld in
+          (x', tld', x_recvset')
+      where nextXSet timer_limit t_now =
+              if (timer_limit < sOverTmbi)
+                 then [(t_now, floor (sOverTmbi / 2))] 
+                 else [(t_now, floor (timer_limit / 2))]
+
 
 intToFloat :: Int -> Float
 intToFloat x = fromInteger $ toInteger x
@@ -192,9 +211,11 @@ updateRate x_recvset x r p t_now tld =
       else if (t_now `diffUTCTime` tld) >= r
         then ((xMaxMin (2 * x) (floor $ initialRate r)), t_now)
         else (x, tld)
-    where recv_limit = snd $ maximumBy (\(x1,y1) (x2,y2) -> compare y1 y2) x_recvset
-          xMaxMin :: Int -> Int -> Int
-          xMaxMin a b = max (min (a) (recv_limit)) (b)
+    where xMaxMin :: Int -> Int -> Int
+          xMaxMin a b = max (min (a) (recv_limit x_recvset)) (b)
+
+recv_limit :: [(UTCTime, Int)] -> Int
+recv_limit x_recvset = snd $ maximumBy (\(x1,y1) (x2,y2) -> compare y1 y2) x_recvset
 
 xBps :: NominalDiffTime -> Float -> Int
 xBps r p = let r' = (intToFloat $ T.diffTimeToS r)
