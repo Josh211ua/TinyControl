@@ -36,7 +36,6 @@ import Network.Socket (
   , bindSocket
   , getNameInfo)
 import Network.BSD (HostName, defaultProtocol)
-import Debug.Trace(trace)
 import Data.Set (Set)
 import qualified Data.Set as Set
 import Data.List (genericDrop, maximumBy)
@@ -92,7 +91,7 @@ serveData port f = do
 howMuchAndWhen :: Int -> UTCTime -> (Int, UTCTime)
 howMuchAndWhen bytesPerSecond now =
   let amount = case ceiling (intToFloat bytesPerSecond /intToFloat P.s) of
-                    0 -> (trace $ "itf bps" ++ (show $ intToFloat bytesPerSecond)) 1
+                    0 -> 1
                     x -> x
     in
   let seconds = ceiling $ intToFloat (amount * P.s) / intToFloat bytesPerSecond in
@@ -104,7 +103,7 @@ serverThreadHelper = do
   let msg = remainingMsg state
   case (numLeft, msg) of
     (0, _) -> recv
-    (_, m) | (ByteString.length m) == 0 -> (trace "done") return ()
+    (_, m) | (ByteString.length m) == 0 -> return ()
     (pNum, m) -> do
       (sock, friend) <- ask
       let (mmsg, rest) = ByteString.splitAt P.s msg
@@ -157,7 +156,7 @@ handlePacket pack = do
     let r' = updateR (r ss) r_sample
     let rto' = updateRto r' (x ss)
     let x_recvset' = (t_now, P.x_recv pack):(updateXRecvset (x_recvset ss) (r') (t_now))
-    let (x', tld') = (\y -> trace ("x': " ++ show y) y) $ updateRate (x_recvset') (x ss)
+    let (x', tld') = updateRate (x_recvset') (x ss)
             (r') (P.p pack) (t_now) (tld ss)
     put ss { r = Just r'
            , rto = rto'
@@ -293,7 +292,7 @@ srecv s =
 
 recv :: ServerStateMonad ()
 recv = do
-    state <- (trace "entering recv") get
+    state <- get
     let sendTime = sendMoreTime state
     let feedBackTime = noFeedBackTime state
     let stopTime = soonerTime sendTime feedBackTime
@@ -307,13 +306,13 @@ recv = do
       Nothing -> if sendTime `soonerThan` feedBackTime
         then -- reset howMuchMore/sendTimer; goto send
           let (packNum, intervalEnd) = howMuchAndWhen (howManyMore state) (sendMoreTime state) in do
-            (trace $ "time to send more!" ++ (show packNum) ++ ":" ++ (show intervalEnd)) put $ state {sendMoreTime = intervalEnd, howManyMore = packNum}
+            put $ state {sendMoreTime = intervalEnd, howManyMore = packNum}
             serverThreadHelper --send
         else do -- reset NOFEEDBACKTIMER; goto recv
-          (trace "expiring no feedback") expireNoFeedbackTimer
+          expireNoFeedbackTimer
           recv
       Just (msg, _, _) -> do
-        (trace "you're got mail :)") tell (["Recv'd: " ++ msg])
+        tell (["Recv'd: " ++ msg])
         handlePacket (read msg)
         recv
 
