@@ -42,7 +42,8 @@ data PreLossEvent = PreLossEvent { before :: PacketStamp
                                  , mdu :: Int
                                  } deriving (Show, Read)
 
-data ClientState = ClientState { intervals :: [Interval]
+data ClientState = ClientState { packetCount :: Int
+                               , intervals :: [Interval]
                                , packetHistory :: [ PreLossEvent ]
                                , lastLossEvent :: Maybe PacketStamp
                                , lastPacketStamp :: PacketStamp
@@ -85,6 +86,7 @@ firstPacket sock = do
 initialState :: P.DataPacket -> UTCTime -> ClientState
 initialState dp t_delay_start = ClientState {
      intervals = []
+   , packetCount = 0
    , packetHistory = []
    , lastLossEvent = Nothing
    , lastPacket = dp
@@ -184,6 +186,8 @@ sendFeedbackPacket sock friend packet = do
 gotDataPacket :: DataPacket -> Bool -> ClientStateMonad ()
 gotDataPacket pack inM3 = do
     ss <- get
+    put ss { packetCount = (packetCount ss) + 1 }
+    ss' <- get
     timeStamp <- lift $ getCurrentTime
     tell [((P.seqNum pack),(P.payload pack))]
     addToPacketHistory pack timeStamp
@@ -191,7 +195,7 @@ gotDataPacket pack inM3 = do
     if loss || inM3
        then do
            let p' = calculateP $ intervals ss
-           let p_prev = p ss
+           let p_prev = p ss'
            put $ ss { p = p' }
            if (p' > p_prev)
               then expireFeedbackTimer
@@ -275,26 +279,43 @@ dealWithLossEvents lossEvents = do
           let sLoss = (fst b) + 1
           let tLoss' = tLoss b a sLoss
           let lastPacket' = lastPacket ss
+          let s_curr = fst $ lastPacketStamp ss
           case lastLossEvent ss of
             Just (_, tOld) -> if (sToDiffTime (P.rtt lastPacket') `addUTCTime` tOld) >= tLoss'
                                  then do
-                                    newLossInterval b a
+                                    newLossInterval b a s_curr
                                     dealWithRest xs
                                  else dealWithRest xs
             Nothing -> error "I have no idea what to put here"
 
 tLoss :: PacketStamp -> PacketStamp -> SeqNum -> TimeStamp
 -- Going to assume sLoss is one after sBegin
-tLoss = undefined
+tLoss (s_before, t_before) (s_after, t_after) s_loss = 
+    let diffSeconds = diffTimeToS (t_after `diffUTCTime` t_before) in
+    let diffDist = floor $ (dist s_loss s_before) / (dist s_after s_before) in
+    (sToDiffTime (diffSeconds * diffDist)) `addUTCTime` t_before
 
-newLossInterval = undefined
+s_max :: Integer
+s_max = 2^32
+
+dist :: SeqNum -> SeqNum -> Float
+dist a b = let s_a = toInteger a in let s_b = toInteger b in
+                     fromInteger $ (s_a + s_max - s_b) `mod` s_max
+
+newLossInterval :: PacketStamp -> PacketStamp -> SeqNum -> ClientStateMonad ()
+newLossInterval (s_old, _) (s_new, _) s_curr = do
+    ss <- get
+    let newInterval = s_new - s_old
+    let currentInterval = s_curr - s_new + 1
+    let nextIntervals = currentInterval:newInterval:(take (n-2) (tail (intervals ss)))
+    put ss { intervals = nextIntervals }
 
 expireFeedbackTimer :: ClientStateMonad ()
 expireFeedbackTimer = do
     (sock,f) <- ask
     ss <- get
     let p' = calculateP (intervals ss)
-    let x_recv' = calculateMeasuredReceiveRate
+    x_recv' <- calculateMeasuredReceiveRate
     put $ ss {p = p', x_recv = x_recv'}
     lift $ makeAndSendFeedbackPacket sock f ss
     resetFeedbackTimer
@@ -333,7 +354,11 @@ wTot :: Float
 wTot = sum wS
 
 -- Calculate x_recv:
-calculateMeasuredReceiveRate = undefined
+calculateMeasuredReceiveRate :: ClientStateMonad (Int)
+calculateMeasuredReceiveRate = do
+    ss <- get
+    return $ floor $ (toRational $ (packetCount ss) * P.s) / 
+        (toRational $ P.rtt $ lastPacket ss)
 
 -- UDP Operations
 open :: String -> String -> IO (Socket, Friend)
