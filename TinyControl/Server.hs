@@ -8,7 +8,7 @@ import qualified TinyControl.Common as C
 import qualified TinyControl.Packet as P
 import qualified TinyControl.Time as T
 
-import Data.Time (UTCTime, NominalDiffTime, diffUTCTime)
+import Data.Time (UTCTime, NominalDiffTime, addUTCTime, diffUTCTime)
 
 
 import Control.Monad.Trans.Class (lift)
@@ -117,10 +117,16 @@ handlePacket pack = do
     let r_sample = calculateRSample t_now (P.t_recvdata pack) (P.t_delay pack)
     let r' = updateR (r ss) r_sample
     let rto' = updateRto r' (x ss)
-    let x_recvset' = updateXRecvset (x_recvset ss)
+    let x_recvset' = updateXRecvset (x_recvset ss) (r') (t_now)
     let (x', tld') = updateRate (x_recvset') (x ss) 
             (r') (P.p pack) (t_now) (tld ss)
-    error "Not implemented"
+    put ss { r = Just r'
+           , rto = rto'
+           , x_recvset = x_recvset'
+           , x = x'
+           , tld = tld'
+           }
+    error "Must reset no feedback timer to rto seconds"
 
 intToFloat :: Int -> Float
 intToFloat x = fromInteger $ toInteger x
@@ -153,7 +159,11 @@ w_init = intToFloat $ min (4 * P.s) (max (2 * P.s) (4380))
 initialRate :: NominalDiffTime -> Float
 initialRate r = (w_init) / (intToFloat $ T.diffTimeToS r)
 
-updateXRecvset = undefined
+updateXRecvset :: [(UTCTime, Int)] -> NominalDiffTime -> UTCTime -> [(UTCTime, Int)]
+updateXRecvset x_recvset r t_now = 
+  let earliestTime = (negate r) `addUTCTime` t_now
+  in filter (timesAfter earliestTime) x_recvset
+     where timesAfter = undefined
 
 updateRate :: [(UTCTime, Int)] -> Int -> NominalDiffTime -> 
     Float -> UTCTime -> UTCTime -> (Int, UTCTime)
