@@ -89,7 +89,10 @@ serveData port f = do
       sClose sock
 howMuchAndWhen :: Int -> UTCTime -> (Int, UTCTime)
 howMuchAndWhen bytesPerSecond now =
-  let amount = ceiling (intToFloat bytesPerSecond /intToFloat P.s) in
+  let amount = case ceiling (intToFloat bytesPerSecond /intToFloat P.s) of
+                    0 -> (trace $ "itf bps" ++ (show $ intToFloat bytesPerSecond)) 1
+                    x -> x
+    in
   let seconds = ceiling $ intToFloat (amount * P.s) / intToFloat bytesPerSecond in
   (amount, T.nextTimeoutSecPure seconds now)
 serverThreadHelper :: ServerStateMonad ()
@@ -111,6 +114,8 @@ serverThreadHelper = do
           P.payload = mmsg
           }
       lift $ send sock friend (show rmsg)
+      state <- get
+      put state {remainingMsg = rest, howManyMore = howManyMore state - 1}
       serverThreadHelper
 
 -- Helper Methods
@@ -129,7 +134,7 @@ handlePacket pack = do
     let r' = updateR (r ss) r_sample
     let rto' = updateRto r' (x ss)
     let x_recvset' = updateXRecvset (x_recvset ss) (r') (t_now)
-    let (x', tld') = updateRate (x_recvset') (x ss)
+    let (x', tld') = (\y -> trace ("x': " ++ show y) y) $ updateRate (x_recvset') (x ss)
             (r') (P.p pack) (t_now) (tld ss)
     put ss { r = Just r'
            , rto = rto'
@@ -260,7 +265,7 @@ srecv s =
 
 recv :: ServerStateMonad ()
 recv = do
-    state <- get
+    state <- (trace "entering recv") get
     let sendTime = sendMoreTime state
     let feedBackTime = noFeedBackTime state
     let stopTime = soonerTime sendTime feedBackTime
@@ -274,13 +279,13 @@ recv = do
       Nothing -> if sendTime `soonerThan` feedBackTime
         then -- reset howMuchMore/sendTimer; goto send
           let (packNum, intervalEnd) = howMuchAndWhen (howManyMore state) (sendMoreTime state) in do
-            put $ state {sendMoreTime = intervalEnd, howManyMore = packNum}
+            (trace $ "time to send more!" ++ (show packNum) ++ ":" ++ (show intervalEnd)) put $ state {sendMoreTime = intervalEnd, howManyMore = packNum}
             serverThreadHelper --send
         else do -- reset NOFEEDBACKTIMER; goto recv
-          expireNoFeedbackTimer
+          (trace "expiring no feedback") expireNoFeedbackTimer
           recv
       Just (msg, _, _) -> do
-        tell (["Recv'd: " ++ msg])
+        (trace "you're got mail :)") tell (["Recv'd: " ++ msg])
         handlePacket (read msg)
         recv
 
