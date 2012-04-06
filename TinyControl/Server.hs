@@ -125,7 +125,7 @@ handlePacket pack = do
     let r' = updateR (r ss) r_sample
     let rto' = updateRto r' (x ss)
     let x_recvset' = updateXRecvset (x_recvset ss) (r') (t_now)
-    let (x', tld') = updateRate (x_recvset') (x ss) 
+    let (x', tld') = updateRate (x_recvset') (x ss)
             (r') (P.p pack) (t_now) (tld ss)
     put ss { r = Just r'
            , rto = rto'
@@ -167,10 +167,10 @@ initialRate :: NominalDiffTime -> Float
 initialRate r = (w_init) / (intToFloat $ T.diffTimeToS r)
 
 updateXRecvset :: [(UTCTime, Int)] -> NominalDiffTime -> UTCTime -> [(UTCTime, Int)]
-updateXRecvset x_recvset r t_now = 
+updateXRecvset x_recvset r t_now =
   let earliestTime = (negate r) `addUTCTime` t_now
   in filter (timesAfter earliestTime) x_recvset
-     where timesAfter = undefined
+     where timesAfter early (mine,_) = early `soonerThan` mine -- UTCTime -> (UTCTime, Int) -> Bool
 
 updateRate :: [(UTCTime, Int)] -> Int -> NominalDiffTime ->
     Float -> UTCTime -> UTCTime -> (Int, UTCTime)
@@ -259,12 +259,12 @@ recv = do
         tell (["Recv'd: " ++ msg])
         handlePacket (read msg)
         recv
-    where
-      soonerTime x y = if x `soonerThan` y then x else y
-      soonerThan x y = case compare x y of
-        LT -> True
-        GT -> False
-        EQ -> True -- put the more important timer first?
+
+soonerTime x y = if x `soonerThan` y then x else y
+soonerThan x y = case compare x y of
+  LT -> True
+  GT -> False
+  EQ -> True -- put the more important timer first?
 
    --, x :: Int -- send rate, bytes per sec
    --, sendMoreTime :: UTCTime
