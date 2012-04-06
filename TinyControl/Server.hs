@@ -49,6 +49,7 @@ data ServerState = ServerState { rto :: NominalDiffTime -- time between nfdbkTim
                                , howManyMore :: Int
                                , noFeedBackTime :: UTCTime
                                , remainingMsg :: ByteString
+                               , lastPacket :: Maybe P.FeedbackPacket
                                }
                                deriving (Show)
 type TimeStamp = UTCTime
@@ -84,6 +85,7 @@ serveData port f = do
                   , howManyMore = packetPerInterval
                   , noFeedBackTime = noFeedBackTimer
                   , remainingMsg = resp
+                  , lastPacket = Nothing
                   }
       (a,s,w) <- runRWST (serverThreadHelper) (sock,friend) theState
       sClose sock
@@ -122,12 +124,33 @@ serverThreadHelper = do
 expireNoFeedbackTimer :: ServerStateMonad ()
 expireNoFeedbackTimer = do
     ss <- get
-    error ""
-
+    t_now <- lift T.now
+    let x_recv = recv_limit (x_recvset ss) in
+      case (r ss) of
+            Nothing -> do 
+                let x' = floor $ max ((intToFloat (x ss)) / 2) (sOverTmbi) 
+                put ss { x = x' }
+            Just r' -> 
+                let p' = case lastPacket ss of
+                        Nothing -> 0
+                        Just pack -> P.p pack in
+                    if p' == 0 
+                       then do 
+                         let x' = floor $ max ((intToFloat (x ss)) / 2) (sOverTmbi)
+                         put ss { x = x' }
+                       else
+                         let bps = xBps r' p'
+                         in if bps > x_recv
+                              then do let (x', tld', x_recvset') = updateLimits (intToFloat x_recv) (x ss) (r') (p') t_now (tld ss)
+                                      put ss { x = x', tld = tld', x_recvset = x_recvset' }
+                              else do let (x', tld', x_recvset') = updateLimits (intToFloat bps) (x ss) (r') (p') t_now (tld ss)
+                                      put ss { x = x', tld = tld', x_recvset = x_recvset' }
 
 
 handlePacket :: P.FeedbackPacket ->  ServerStateMonad ()
 handlePacket pack = do
+    ss_old <- get
+    put ss_old {lastPacket = Just pack}
     ss <- get
     t_now <- lift $ T.now
     let r_sample = calculateRSample t_now (P.t_recvdata pack) (P.t_delay pack)
