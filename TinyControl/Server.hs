@@ -40,16 +40,16 @@ import Debug.Trace(trace)
 import Data.Set (Set)
 import qualified Data.Set as Set
 import Data.List (genericDrop)
-
-type TimeStamp = UTCTime
-
-data ServerState = ServerState { rto :: NominalDiffTime
-                               , tld :: UTCTime
-                               , r :: Maybe NominalDiffTime
-                               , x_recvset :: Set (UTCTime, Int)
-                               , x :: Int
+data ServerState = ServerState { rto :: NominalDiffTime -- time between nfdbkTimer expirations
+                               , tld :: UTCTime         -- time last doubled
+                               , r :: Maybe NominalDiffTime -- estimate of RTT
+                               , x_recvset :: Set (UTCTime, Int) -- set of Xrecvs
+                               , x :: Int -- send rate, bytes per sec
+                               , sendMoreTime :: UTCTime
+                               , noFeedBackTime :: UTCTime
                                }
                                deriving (Show)
+type TimeStamp = UTCTime
 
 type ServerHandle = Handle ServerState
 
@@ -71,12 +71,14 @@ serveData port f = do
     serverThread sock friend msg = do
       resp <- f msg
       now <- T.now
-      let theState = ServerState {
-                  rto = T.sToDiffTime 2,
-                  tld = now,
-                  r = Nothing,
-                  x_recvset = Set.empty,
-                  x = P.s
+      noFeedBackTimer <- T.nextTimeoutSec 2
+      let theState = ServerState { rto = T.sToDiffTime 2
+                  , tld = now
+                  , r = Nothing
+                  , x_recvset = Set.empty
+                  , x = P.s
+                  , sendMoreTime = now
+                  , noFeedBackTime = noFeedBackTimer
                   }
       (a,s,w) <- runRWST (serverThreadHelper resp) (sock,friend) theState
       sClose sock
@@ -98,14 +100,14 @@ serveData port f = do
 -- Helper Methods
 expireNoFeedbackTimer :: ServerStateMonad ()
 expireNoFeedbackTimer = undefined
- 
+
 handlePacket :: P.FeedbackPacket ->  ServerStateMonad ()
 handlePacket pack = do
     ss <- get
     r_sample <- lift $ calculateRSample (P.t_recvdata pack) (P.t_delay pack)
     let r' = updateR (r ss) r_sample
     error "Not implemented"
-    
+
 calculateRSample :: UTCTime -> Int -> IO NominalDiffTime
 calculateRSample t_recvdata t_delay = do
     t_now <- T.now
