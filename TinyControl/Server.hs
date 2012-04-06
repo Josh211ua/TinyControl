@@ -167,7 +167,10 @@ updateRate x_recvset x r p t_now tld =
           xMaxMin :: Int -> Int -> Int
           xMaxMin a b = max (min (a) (recv_limit)) (b)
     
-xBps = undefined
+xBps :: NominalDiffTime -> Float -> Int
+xBps r p = let r' = (intToFloat $ T.diffTimeToS r)
+  in floor $ (intToFloat P.s) / 
+        (r' * (sqrt (2 * p / 3)) + 12 * (sqrt (3 * p / 8)) * p * (1 + 32 * p^2))
 
 -- Network Operations
 open :: String -> IO (Socket)
