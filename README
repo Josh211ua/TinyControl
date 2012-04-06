@@ -26,5 +26,8 @@ The Library Code is located in the TinyControl folder:
 	Client.hs: This is the library used by the client application. All the client can do is say "this is the server I want to get something from, and this is the data I want to send to it.", by calling "wantData".
 	Server.hs: This is the library used by the server application. All the server can do is say "Clients will contact me at this port. Here is the function that will turn their message into the data to return. The function that I give you can do input/output (read from disk, etc).". The server library then takes care of forking off a thread to handle each client and send the data.
 
-Some
+Some Implementation Details:
+	We handle rate limiting by sending all the packets that we are allowed to (upto the average rate), and then waiting until to send more packets until the amount of data we send initially divided by our wait time is no greater than the maximum average rate.
+	The initialization protocol is that the client sends the server a packet. This packet can inidicate what data to send; then the server starts sending. The first packet that the client gets from the server determines where the the client will send all feedback packets. This allows the server to talk to multipled clients, since each of them can be moved off to their own port on the server.
+	We did not implement section 3.2.7. (Initializing Loss History After First Loss Event). We think we managed to do the rest.
 
