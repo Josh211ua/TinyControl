@@ -238,6 +238,7 @@ updateRate x_recvset x r p t_now tld =
           xMaxMin a b = max (min (a) (2 * (recv_limit x_recvset))) (b)
 
 recv_limit :: [(UTCTime, Int)] -> Int
+recv_limit [] = 1000
 recv_limit x_recvset = snd $ maximumBy (\(x1,y1) (x2,y2) -> compare y1 y2) x_recvset
 
 xBps :: NominalDiffTime -> Float -> Int
