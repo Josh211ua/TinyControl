@@ -94,7 +94,15 @@ serveData port f = do
       lift $ send sock friend (show rmsg)
       (serverThreadHelper rest)
 
+-- Helper Methods
+expireNoFeedbackTimer :: ServerStateMonad ()
+expireNoFeedbackTimer = undefined
+ 
+handlePacket :: P.FeedbackPacket -> ServerStateMonad ()
+handlePacket h = undefined
 
+
+-- Network Operations
 open :: String -> IO (Socket)
 open port =
     do -- Look up the hostname and port.  Either raises an exception
