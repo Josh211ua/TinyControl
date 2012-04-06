@@ -38,9 +38,7 @@ instance Show DataPacket where
 
 instance Read DataPacket where
     readsPrec _ b =
-        let (s, r, p) = decode $ (\x -> case (BLC.length x) of
-                                            1024 -> x
-                                            y -> (trace (show y)) x) $ BLC.pack $ b in
+        let (s, r, p) = decode $ BLC.pack $ b in
         [(DataPacket { seqNum = s
                    , timeStamp = read "0000-00-00 00:00:00"
                    , rtt = r
