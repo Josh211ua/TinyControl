@@ -141,7 +141,11 @@ handlePacket pack = do
     resetFeedbackTimer
 
 resetFeedbackTimer :: ServerStateMonad ()
-resetFeedbackTimer = undefined
+resetFeedbackTimer = do
+  state <- get
+  let diff = rto state
+  t <- lift $ T.nextTimeoutNDT diff
+  put state {noFeedBackTime = t}
 
 intToFloat :: Int -> Float
 intToFloat x = fromInteger $ toInteger x
