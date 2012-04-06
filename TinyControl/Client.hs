@@ -7,7 +7,7 @@ import TinyControl.Common (Handle(..), Data(..), Friend, makeTimeDiff)
 import qualified TinyControl.Common as C
 import qualified TinyControl.Packet as P
 import TinyControl.Packet (DataPacket)
-import TinyControl.Time (diffTimeToS, sToDiffTime, getTimeout, nextTimeout, toUs)
+import TinyControl.Time (diffTimeToS, sToDiffTime, getTimeout, nextTimeoutSec, toUs)
 
 import Control.Monad.Trans.Class (lift)
 import Control.Monad.Trans.RWS.Lazy hiding (state)
@@ -76,7 +76,7 @@ firstPacket sock = do
          -- send Feedback Packet
          makeAndSendFeedbackPacket sock friend ss
          -- determine timeout interval
-         futureTimeout <- nextTimeout (P.rtt packet)
+         futureTimeout <- nextTimeoutSec (P.rtt packet)
          let ss' = ss {nextTimeoutTime = futureTimeout}
          -- begin running through states
          let nextPacket = receiveNextPacket sock ss'
@@ -290,7 +290,7 @@ dealWithLossEvents lossEvents = do
 
 tLoss :: PacketStamp -> PacketStamp -> SeqNum -> TimeStamp
 -- Going to assume sLoss is one after sBegin
-tLoss (s_before, t_before) (s_after, t_after) s_loss = 
+tLoss (s_before, t_before) (s_after, t_after) s_loss =
     let diffSeconds = diffTimeToS (t_after `diffUTCTime` t_before) in
     let diffDist = floor $ (dist s_loss s_before) / (dist s_after s_before) in
     (sToDiffTime (diffSeconds * diffDist)) `addUTCTime` t_before
@@ -324,7 +324,7 @@ resetFeedbackTimer :: ClientStateMonad  ()
 resetFeedbackTimer = do
   ss <- get
   let lastPack = lastPacket ss
-  futureTimeout <- lift $ nextTimeout $ P.rtt lastPack
+  futureTimeout <- lift $ nextTimeoutSec $ P.rtt lastPack
   put $ ss { nextTimeoutTime = futureTimeout }
 
 -- Calculate P:
@@ -357,7 +357,7 @@ wTot = sum wS
 calculateMeasuredReceiveRate :: ClientStateMonad (Int)
 calculateMeasuredReceiveRate = do
     ss <- get
-    return $ floor $ (toRational $ (packetCount ss) * P.s) / 
+    return $ floor $ (toRational $ (packetCount ss) * P.s) /
         (toRational $ P.rtt $ lastPacket ss)
 
 -- UDP Operations
