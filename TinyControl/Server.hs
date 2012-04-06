@@ -48,6 +48,7 @@ data ServerState = ServerState { rto :: NominalDiffTime -- time between nfdbkTim
                                , sendMoreTime :: UTCTime
                                , howManyMore :: Int
                                , noFeedBackTime :: UTCTime
+                               , remainingMsg :: ByteString
                                }
                                deriving (Show)
 type TimeStamp = UTCTime
@@ -82,29 +83,35 @@ serveData port f = do
                   , sendMoreTime = sendMoreT
                   , howManyMore = packetPerInterval
                   , noFeedBackTime = noFeedBackTimer
+                  , remainingMsg = resp
                   }
-      (a,s,w) <- runRWST (serverThreadHelper resp) (sock,friend) theState
+      (a,s,w) <- runRWST (serverThreadHelper) (sock,friend) theState
       sClose sock
     howMuchAndWhen :: Int -> UTCTime -> (Int, UTCTime)
     howMuchAndWhen bytesPerSecond now =
-      let fractionalP =bytesPerSecond / P.s in
-      let amount = ceiling fractionalP in
+      let amount = ceiling (intToFloat bytesPerSecond /intToFloat P.s) in
       let seconds = ceiling $ intToFloat (amount * P.s) / intToFloat bytesPerSecond in
       (amount, T.nextTimeoutSecPure seconds now)
-    serverThreadHelper :: Data -> ServerStateMonad ()
-    serverThreadHelper m | (ByteString.length m) == 0 = (trace "done") return ()
-    serverThreadHelper msg = do
-      (sock, friend) <- ask
-      let (mmsg, rest) = ByteString.splitAt P.s msg
-      now <- lift T.now
-      let rmsg = P.DataPacket {
-          P.seqNum = 0,
-          P.timeStamp = now,
-          P.rtt = 2,
-          P.payload = mmsg
-          }
-      lift $ send sock friend (show rmsg)
-      (serverThreadHelper rest)
+    serverThreadHelper :: ServerStateMonad ()
+    serverThreadHelper = do
+      state <- get
+      let numLeft = howManyMore state
+      let msg = remainingMsg state
+      case (numLeft, msg) of
+        (0, _) -> recv
+        (_, m) | (ByteString.length m) == 0 -> (trace "done") return ()
+        (pNum, m) -> do
+          (sock, friend) <- ask
+          let (mmsg, rest) = ByteString.splitAt P.s msg
+          now <- lift T.now
+          let rmsg = P.DataPacket {
+              P.seqNum = 0,
+              P.timeStamp = now,
+              P.rtt = 2,
+              P.payload = mmsg
+              }
+          lift $ send sock friend (show rmsg)
+          serverThreadHelper
 
 -- Helper Methods
 expireNoFeedbackTimer :: ServerStateMonad ()
@@ -142,12 +149,12 @@ updateR :: Maybe NominalDiffTime -> NominalDiffTime -> NominalDiffTime
 updateR r_old r_sample = case (r_old) of
     Nothing -> r_sample
     Just (r) -> T.sToDiffTime $ floor $
-        q * (fromInteger $ toInteger $ T.diffTimeToS r) + 
+        q * (fromInteger $ toInteger $ T.diffTimeToS r) +
         (1 - q) * (fromInteger $ toInteger $ T.diffTimeToS r_sample)
 
 updateRto :: NominalDiffTime -> Int -> NominalDiffTime
-updateRto r x = T.sToDiffTime $ max 
-    (4 * (T.diffTimeToS r)) 
+updateRto r x = T.sToDiffTime $ max
+    (4 * (T.diffTimeToS r))
     (floor $ (intToFloat $ 2 * P.s) / (intToFloat $ x))
 
 t_mbi :: Float
@@ -165,9 +172,9 @@ updateXRecvset x_recvset r t_now =
   in filter (timesAfter earliestTime) x_recvset
      where timesAfter = undefined
 
-updateRate :: [(UTCTime, Int)] -> Int -> NominalDiffTime -> 
+updateRate :: [(UTCTime, Int)] -> Int -> NominalDiffTime ->
     Float -> UTCTime -> UTCTime -> (Int, UTCTime)
-updateRate x_recvset x r p t_now tld = 
+updateRate x_recvset x r p t_now tld =
     if p > 0
       then ((xMaxMin (xBps r p) (floor $ ((intToFloat P.s) / t_mbi))), tld)
       else if (t_now `diffUTCTime` tld) >= r
@@ -176,10 +183,10 @@ updateRate x_recvset x r p t_now tld =
     where recv_limit = snd $ maximumBy (\(x1,y1) (x2,y2) -> compare y1 y2) x_recvset
           xMaxMin :: Int -> Int -> Int
           xMaxMin a b = max (min (a) (recv_limit)) (b)
-    
+
 xBps :: NominalDiffTime -> Float -> Int
 xBps r p = let r' = (intToFloat $ T.diffTimeToS r)
-  in floor $ (intToFloat P.s) / 
+  in floor $ (intToFloat P.s) /
         (r' * (sqrt (2 * p / 3)) + 12 * (sqrt (3 * p / 8)) * p * (1 + 32 * p^2))
 
 -- Network Operations
@@ -227,18 +234,30 @@ srecv s =
       return (addr, d)
 
 
-recv :: ServerStateMonad (P.FeedbackPacket)
+recv :: ServerStateMonad ()
 recv = do
+    state <- get
+    let sendTime = sendMoreTime state
+    let feedBackTime = noFeedBackTime state
+    let stopTime = soonerTime sendTime feedBackTime
+    timeoutInterval <- lift $ T.getTimeout stopTime
     (sock, friend) <- ask
       -- Receive one UDP packet, maximum length 1024 bytes,
       -- and save its content into msg and its source
       -- IP and port into addr
-    mresult <- lift $ timeout 5 (recvFrom sock 1024)
+    mresult <- lift $ timeout timeoutInterval (recvFrom sock 1024)
     case mresult of
-      Nothing -> error "timer expired"
+      Nothing -> if sendTime `soonerThan` feedBackTime
+        then undefined -- reset howMuchMore/sendTimer; goto send
+        else undefined -- reset NOFEEDBACKTIMER; goto recv
       Just (msg, _, _) -> do
         tell (["Recv'd: " ++ msg])
-        return $ read msg
+        let feedbackPacket = (read msg)::P.FeedbackPacket
+        -- TODO: calculate stats based on feedback
+        recv
+    where
+      soonerTime x y = if x `soonerThan` y then x else y
+      soonerThan x y = undefined
 
 send :: Socket -> Friend -> String -> IO ()
 send a friend msg = C.sendstr a friend msg
