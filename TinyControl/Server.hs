@@ -90,7 +90,7 @@ serveData port f = do
 howMuchAndWhen :: Int -> UTCTime -> (Int, UTCTime)
 howMuchAndWhen bytesPerSecond now =
   let amount = case ceiling (intToFloat bytesPerSecond /intToFloat P.s) of
-                    0 -> 1
+                    0 -> (trace $ "itf bps" ++ (show $ intToFloat bytesPerSecond)) 1
                     x -> x
     in
   let seconds = ceiling $ intToFloat (amount * P.s) / intToFloat bytesPerSecond in
@@ -130,7 +130,7 @@ handlePacket pack = do
     let r' = updateR (r ss) r_sample
     let rto' = updateRto r' (x ss)
     let x_recvset' = updateXRecvset (x_recvset ss) (r') (t_now)
-    let (x', tld') = updateRate (x_recvset') (x ss)
+    let (x', tld') = (\y -> trace ("x': " ++ show y) y) $ updateRate (x_recvset') (x ss)
             (r') (P.p pack) (t_now) (tld ss)
     put ss { r = Just r'
            , rto = rto'

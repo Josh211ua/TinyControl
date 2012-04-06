@@ -50,5 +50,5 @@ getTimeout t = do
     let diff = t `diffUTCTime` now
     let realDiff = floor $ (toRational diff)
     if realDiff < 0
-       then return 0
+       then return 1
        else return realDiff
