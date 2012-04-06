@@ -87,31 +87,31 @@ serveData port f = do
                   }
       (a,s,w) <- runRWST (serverThreadHelper) (sock,friend) theState
       sClose sock
-    howMuchAndWhen :: Int -> UTCTime -> (Int, UTCTime)
-    howMuchAndWhen bytesPerSecond now =
-      let amount = ceiling (intToFloat bytesPerSecond /intToFloat P.s) in
-      let seconds = ceiling $ intToFloat (amount * P.s) / intToFloat bytesPerSecond in
-      (amount, T.nextTimeoutSecPure seconds now)
-    serverThreadHelper :: ServerStateMonad ()
-    serverThreadHelper = do
-      state <- get
-      let numLeft = howManyMore state
-      let msg = remainingMsg state
-      case (numLeft, msg) of
-        (0, _) -> recv
-        (_, m) | (ByteString.length m) == 0 -> (trace "done") return ()
-        (pNum, m) -> do
-          (sock, friend) <- ask
-          let (mmsg, rest) = ByteString.splitAt P.s msg
-          now <- lift T.now
-          let rmsg = P.DataPacket {
-              P.seqNum = 0,
-              P.timeStamp = now,
-              P.rtt = 2,
-              P.payload = mmsg
-              }
-          lift $ send sock friend (show rmsg)
-          serverThreadHelper
+howMuchAndWhen :: Int -> UTCTime -> (Int, UTCTime)
+howMuchAndWhen bytesPerSecond now =
+  let amount = ceiling (intToFloat bytesPerSecond /intToFloat P.s) in
+  let seconds = ceiling $ intToFloat (amount * P.s) / intToFloat bytesPerSecond in
+  (amount, T.nextTimeoutSecPure seconds now)
+serverThreadHelper :: ServerStateMonad ()
+serverThreadHelper = do
+  state <- get
+  let numLeft = howManyMore state
+  let msg = remainingMsg state
+  case (numLeft, msg) of
+    (0, _) -> recv
+    (_, m) | (ByteString.length m) == 0 -> (trace "done") return ()
+    (pNum, m) -> do
+      (sock, friend) <- ask
+      let (mmsg, rest) = ByteString.splitAt P.s msg
+      now <- lift T.now
+      let rmsg = P.DataPacket {
+          P.seqNum = 0,
+          P.timeStamp = now,
+          P.rtt = 2,
+          P.payload = mmsg
+          }
+      lift $ send sock friend (show rmsg)
+      serverThreadHelper
 
 -- Helper Methods
 expireNoFeedbackTimer :: ServerStateMonad ()
@@ -238,7 +238,10 @@ recv = do
     mresult <- lift $ timeout timeoutInterval (recvFrom sock 1024)
     case mresult of
       Nothing -> if sendTime `soonerThan` feedBackTime
-        then undefined -- reset howMuchMore/sendTimer; goto send
+        then -- reset howMuchMore/sendTimer; goto send
+          let (packNum, intervalEnd) = howMuchAndWhen (howManyMore state) (sendMoreTime state) in do
+            put $ state {sendMoreTime = intervalEnd, howManyMore = packNum}
+            serverThreadHelper --send
         else undefined -- reset NOFEEDBACKTIMER; goto recv
       Just (msg, _, _) -> do
         tell (["Recv'd: " ++ msg])
@@ -246,7 +249,15 @@ recv = do
         recv
     where
       soonerTime x y = if x `soonerThan` y then x else y
-      soonerThan x y = undefined
+      soonerThan x y = case compare x y of
+        LT -> True
+        GT -> False
+        EQ -> True -- put the more important timer first?
+
+   --, x :: Int -- send rate, bytes per sec
+   --, sendMoreTime :: UTCTime
+   --, howManyMore :: Int
+--howMuchAndWhen :: Int -> UTCTime -> (Int, UTCTime)
 
 send :: Socket -> Friend -> String -> IO ()
 send a friend msg = C.sendstr a friend msg
